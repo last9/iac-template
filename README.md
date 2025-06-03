@@ -7,7 +7,7 @@ This repo is used to manage alerts on Last9.
 You can manage application and infra alerting by following these steps:
 
 1. Create a new branch for checking in changes.
-2. Add relevant alerting yaml files in [./workspace/alerts/app](./workspace/alerts/app)
+2. Add relevant alerting yaml files in [./templates/alerts](./templates/alerts)
 3. Raise a PR.
 4. This will cause Last9 Infra-as-code (referred to IaC henceforth) to run a plan (similar to `terraform plan`) to do syntactic and semantic validation of the checked in files.
 5. Review and merge the PR to main.
