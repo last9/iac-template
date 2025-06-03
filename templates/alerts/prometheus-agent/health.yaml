@@ -1,0 +1,81 @@
+entities:
+  - name: prometheus_agent-alerts$tmpl_var_name_suffix
+    type: prometheus_agent_monitoring
+    entity_class: alert-manager
+    data_source: $tmpl_var_prometheus_agent_data_source
+    external_ref: alert-manager-ref-prometheus-agent-alerts$tmpl_var_name_suffix
+    tags :
+     - last9_monitoring
+    indicators:
+      - name: prom_agent_status
+        query: sum by ($tmpl_var_prometheus_agent_metrics_label_key, job)(up{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex", job="prometheus"})
+      - name: los_prom_agent_status
+        query: absent_over_time(sum by ($tmpl_var_prometheus_agent_metrics_label_key, job)(up{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex", job="prometheus"}))
+      - name: samples_received
+        query: sum by (instance,$tmpl_var_prometheus_agent_metrics_label_key)(rate(prometheus_remote_storage_samples_in_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m]))
+      - name: samples_dropped
+        query: sum by (instance, $tmpl_var_prometheus_agent_metrics_label_key, url)(rate(prometheus_remote_storage_samples_dropped_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m]))
+      - name: samples_failed
+        query: sum by (instance,$tmpl_var_prometheus_agent_metrics_label_key, url)(increase(prometheus_remote_storage_samples_failed_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m]))
+      - name: samples_pending_percent
+        query: (sum by (instance,$tmpl_var_prometheus_agent_metrics_label_key, url)(prometheus_remote_storage_samples_pending{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"})/max by (instance,$tmpl_var_prometheus_agent_metrics_label_key, url)(rate(prometheus_remote_storage_samples_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m])*60))*100
+      - name: samples_failed_percent
+        query: (sum by (instance,$tmpl_var_prometheus_agent_metrics_label_key)(increase(prometheus_remote_storage_samples_failed_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}))/max by (instance,$tmpl_var_prometheus_agent_metrics_label_key)(rate(prometheus_remote_storage_samples_total{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m])*60))*100
+      - name: wal_lag
+        query: ((max by (instance, $tmpl_var_prometheus_agent_metrics_label_key) (max_over_time(prometheus_tsdb_wal_segment_current{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m]))) - (max by (instance, $tmpl_var_prometheus_agent_metrics_label_key) (max_over_time(prometheus_wal_watcher_current_segment{$tmpl_var_prometheus_agent_metrics_label_key=~"$tmpl_var_prometheus_agent_metrics_label_value_regex"}[1m]))))
+
+    alert_rules:
+      - name: prom_agent_los_breach_alert
+        indicator: los_prom_agent_status
+        greater_than: 0
+        bad_minutes: 10
+        total_minutes: 10
+        severity: breach
+      - name: prom_agent_status_alert
+        indicator: prom_agent_status
+        less_than: 1
+        bad_minutes: 10
+        total_minutes: 10
+        severity: breach
+      - name: samples_received_dropped_breach_alert
+        indicator: samples_received
+        less_than: 100
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: samples_dropped_breach_alert
+        indicator: samples_dropped
+        greater_than: 5
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: samples_failed_breach_alert
+        indicator: samples_failed
+        greater_than: 5
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: samples_pending_percent_breach_alert
+        indicator: samples_pending_percent
+        greater_than: 5
+        bad_minutes: 10
+        total_minutes: 10
+        severity: breach
+      - name: samples_failed_percent_breach_alert
+        indicator: samples_failed_percent
+        greater_than: 2
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: wal_lag_breach_alert
+        indicator: wal_lag
+        greater_than: 0
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+
+    notification_channels:
+      - name: $tmpl_var_notification_slack_channel_name
+        type: slack
+        severity: breach
+        mention: $tmpl_var_notification_channel_mention

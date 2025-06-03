@@ -1,0 +1,226 @@
+#!/bin/bash
+
+set -eou pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+function usage() {
+  if [ -n "$1" ]; then
+    >&2 echo -e "ERROR: $1\n"
+  fi
+  >&2 echo "Usage: $0 [-t alert_type] [-i input_file] [-o output_file]"
+  >&2 echo "  -t, --type               alert type"
+  >&2 echo "  -e, --edit-config        edit config"
+  >&2 echo "  -o, --output-name        output name to be used in workspace dir"
+  >&2 echo "  -i, --tmpl-vars-file     input file"
+  >&2 echo "  -p, --plan               run plan only"
+  >&2 echo "  -a, --apply              run apply"
+  >&2 echo "  -y, --yes                run apply with yes"
+  >&2 echo ""
+  >&2 echo "Example: $0 --type alert_type --tmpl-vars-file path_to_user_template_vars_file --output-name output_name"
+}
+extra_opts=${extra_opts:-""}
+
+# parse params
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -t | --type)
+    alert_type="$2"
+    shift
+    shift
+    ;;
+  -e | --edit-config)
+    edit_config="1"
+    shift
+    ;;
+  -o | --output-name)
+    output_name="$2"
+    shift
+    shift
+    ;;
+  -i | --tmpl-vars-file)
+    user_template_vars_file="$2"
+    shift
+    shift
+    ;;
+  -p | --plan)
+    extra_opts="$extra_opts --plan"
+    shift
+    ;;
+  -a | --apply)
+    extra_opts="$extra_opts --apply"
+    shift
+    ;;
+  -y | --yes)
+    extra_opts="$extra_opts --yes"
+    shift
+    ;;
+  *)
+    usage "Unknown parameter passed: $1"
+    exit 1
+    ;;
+esac done
+
+alert_type=${alert_type:-""}
+if [[ $alert_type == "" ]]; then
+  usage "alert_type empty or not specified"
+  exit 1
+fi
+
+edit_config=${edit_config:-"0"}
+
+output_name=${output_name:-""}
+if [[ "$output_name" == "" ]]; then
+  output_name="$alert_type"
+fi
+
+user_template_vars_file="${user_template_vars_file:-workspace/config/${output_name}.toml}"
+output_file="workspace/alerts/$output_name/health.yaml"
+
+if [[ $alert_type != "vmagent" ]] && [[ $alert_type != "prometheus-agent" ]] && [[ $alert_type != "levitate" ]]; then
+  usage "Invalid alert_type=$alert_type specified"
+  exit 1
+fi
+
+config_file='.last9.config.json'
+env_vars_file="/tmp/.last9.config.sh"
+
+echo >&2 "------------------------"
+if [[ -f $config_file ]]; then
+  if ! "$SCRIPT_DIR/load-config.sh" --config-file "$config_file" --output-file "$env_vars_file" --cache-config; then
+    echo >&2 "ERROR: Failed to load config file $config_file"
+    exit 1
+  fi
+else
+  if ! "$SCRIPT_DIR/load-config.sh" --output-file "$env_vars_file"; then
+    echo >&2 "ERROR: Failed to load config from env vars"
+    exit 1
+  fi
+fi
+
+# shellcheck disable=1090
+source $env_vars_file
+
+>&2 echo "------------------------"
+# Validate loaded config
+if ! "$SCRIPT_DIR/validate-config.sh" --env-vars-file "$env_vars_file"; then
+  >&2 echo "ERROR: Failed to validate env vars file $env_vars_file"
+  exit 1
+fi
+
+template_file="templates/alerts/$alert_type/health.yaml"
+default_template_vars_file="templates/config/${alert_type}.toml"
+
+tmp_template_vars_file="/tmp/last9-iac-alert-templates/config/${output_name}.toml"
+mkdir -p "$(dirname "$tmp_template_vars_file")"
+
+# Set again to prevent "unbound variable" syntax error
+EDITOR=${EDITOR:-""}
+
+if ! [[ -f "$user_template_vars_file" ]]; then
+  >&2 echo "STATUS: user_template_vars_file=$user_template_vars_file does not exist."
+
+  if [[ "$EDITOR" == "" ]]; then
+    >&2 echo "ERROR: EDITOR not set. Cannot create $user_template_vars_file"
+    exit 1
+  fi
+
+  >&2 echo "STATUS: Creating tmp_template_vars_file=$tmp_template_vars_file from default_template_vars_file=$default_template_vars_file"
+
+  if [[ -f "$tmp_template_vars_file" ]]; then
+    >&2 echo "STATUS: Found older version of tmp_template_vars_file=$tmp_template_vars_file - deleting it."
+  fi
+
+  mkdir -p "$(dirname "$tmp_template_vars_file")"
+
+  if ! cp "$default_template_vars_file" "$tmp_template_vars_file"; then
+    >&2 echo "ERROR: Failed to move template_vars_file=$default_template_vars_file to tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  >&2 echo "STATUS: Creating user_template_vars_file=$user_template_vars_file from tmp_template_vars_file=$tmp_template_vars_file"
+
+  # Record mtime before editing the file
+  mtime_before_edit=$(\stat "$tmp_template_vars_file" | grep 'Modify:')
+
+  if ! $EDITOR "$tmp_template_vars_file"; then
+    >&2 echo "ERROR: Failed to edit tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  mtime_after_edit=$(\stat "$tmp_template_vars_file" | grep 'Modify:')
+  if [[ "$mtime_before_edit" == "$mtime_after_edit" ]]; then
+    >&2 echo "ERROR: Aborting - user quit without saving tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$user_template_vars_file")"
+
+  if ! mv "$tmp_template_vars_file" "$user_template_vars_file"; then
+    >&2 echo "ERROR: Failed to copy tmp_template_vars_file=$tmp_template_vars_file to user_template_vars_file=$user_template_vars_file"
+    exit 1
+  fi
+  >&2 echo "STATUS: Created user_template_vars_file=$user_template_vars_file"
+
+else
+
+  >&2 echo "STATUS: user_template_vars_file=$user_template_vars_file exists. Using it."
+
+  if [[ "$edit_config" == "1" ]]; then
+    # Record mtime before editing the file
+    mtime_before_edit=$(\stat "$user_template_vars_file" | grep 'Modify:')
+
+    if ! $EDITOR "$user_template_vars_file"; then
+      >&2 echo "ERROR: Failed to edit user_template_vars_file=$user_template_vars_file"
+      exit 1
+    fi
+
+    mtime_after_edit=$(\stat "$user_template_vars_file" | grep 'Modify:')
+    if [[ "$mtime_before_edit" == "$mtime_after_edit" ]]; then
+      >&2 echo "ERROR: Aborting - user quit without saving user_template_vars_file=$user_template_vars_file"
+      exit 1
+    fi
+  fi
+fi
+
+mkdir -p "$(dirname "$output_file")"
+
+>&2 echo "STATUS: Generating alert_type=$alert_type alerts for output_name=$output_name"
+>&2 echo "STATUS: template_file=$template_file"
+>&2 echo "STATUS: template_vars_file=$user_template_vars_file"
+>&2 echo "STATUS: output_file=$output_file"
+
+set -x
+python3 "$SCRIPT_DIR/patch_template.py" --tmpl-file "$template_file" --tmpl-vars-file "$user_template_vars_file" --tmpl-vars-file-section "alerts" --no-ignore-missing-vars > "$output_file"
+set +x
+# shellcheck disable=SC2181
+if [[ $? -ne 0 ]]; then
+  >&2 echo "ERROR: Failed to generate alert_type=$alert_type alerts for output_name=$output_name. Save the command executed, the terminal output and contact the Last9 team."
+  exit 1
+fi
+
+>&2 echo "SUCCESS: Created $output_file."
+
+>&2 echo "SUCCESS: Running iac plan"
+
+echo "-------------------------"
+set -x
+# shellcheck disable=2086
+"$SCRIPT_DIR/run-iac.sh" --run-input-file "$output_file" --plan
+set +x
+
+if echo "$extra_opts" | \grep -q 'apply' ; then
+  if ! echo "$extra_opts" | \grep -q 'yes'; then
+    >&2 echo "SUCCESS: iac plan completed"
+    echo
+    read -r -p "Do you want to continue with apply? [y/n]: " user_input
+    echo
+  else
+    user_input='y'
+  fi
+  if [[ "$user_input" == 'y' ]]; then
+    "$SCRIPT_DIR/run-iac.sh" --run-input-file "$output_file" --apply
+  fi
+else
+  >&2 echo "STATUS: skipping apply"
+  >&2 echo "Check in the following files and commit to master branch to run iac apply - $output_file"
+fi

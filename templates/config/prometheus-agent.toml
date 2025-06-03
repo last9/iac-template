@@ -1,0 +1,69 @@
+# Common variables used in all sections
+[common]
+
+
+# Template variables used for patching prometheus_agent alerts
+[alerts]
+#
+# variable     : tmpl_var_name_suffix
+# description  : unique tag to identify your setup / environment.
+#
+tmpl_var_name_suffix = ""
+#
+# variable     : tmpl_var_prometheus_agent_data_source
+# description  : Levitate data source used to query for prometheus_agent metrics. Check with Last9 for finding it out.
+#
+tmpl_var_prometheus_agent_data_source = "prometheus_agent_data_source"
+#
+# variable     : tmpl_var_prometheus_agent_metrics_label_key
+# description  : If you want to filter specific prometheus_agents only provide the identifying label key used when scraping metrics.
+#
+tmpl_var_prometheus_agent_metrics_label_key = "job"
+#
+# variable     : tmpl_var_prometheus_agent_metrics_label_value_regex
+# description  : For `tmpl_var_prometheus_agent_metrics_label_key` corresponding value.
+#
+tmpl_var_prometheus_agent_metrics_label_value_regex =  ".*prometheus-agent.*"
+#
+# variable     : tmpl_var_notification_slack_channel_name
+# description  : Slack channel to send alert notification. This channel must be configured as a notification channel in Last9.
+#
+tmpl_var_notification_slack_channel_name = "last9-cs-alerts"
+#
+# variable     : tmpl_var_notification_channel_mention
+# description  : Slack mentions to use in the notification.
+#
+tmpl_var_notification_channel_mention = "csalerts"
+
+# Template variables used for patching Grafana dashboards
+[grafana_dashboards]
+#
+# variable     : tmpl_var_name_suffix
+# description  : unique name to identify your setup / environment. Update it if you have mutliple prometheus_agents e.g. -prometheus-agent-eu, -prometheus-agent-in
+#
+tmpl_var_name_suffix = ""
+#
+# variable     : tmpl_var_dashboard_tag
+# description  : dashboard tag to use to edit the dashboard. Update it if you have multiple prometheus_agents e.g. prometheus_agent-eu, prometheus_agent-in
+#
+tmpl_var_dashboard_tag = "prometheus_agent"
+#
+# variable     : tmpl_var_prometheus_agent_data_source
+# description  : Levitate data source used to query for prometheus_agent metrics. Check with Last9 for finding it out.
+#
+tmpl_var_prometheus_agent_data_source = "prometheus_agent_data_source"
+#
+# variable     : tmpl_var_prometheus_agent_metrics_label_key
+# description  : If you want to filter specific prometheus_agents only provide the identifying label key used when scraping metrics.
+#
+tmpl_var_prometheus_agent_metrics_label_key = "job"
+#
+# variable     : tmpl_var_prometheus_agent_metrics_label_value_regex
+# description  : For `tmpl_var_prometheus_agent_metrics_label_key` corresponding value.
+#
+tmpl_var_prometheus_agent_metrics_label_value_regex =  ".*prometheus.*"
+#
+# variable     : tmpl_var_prometheus_agent_pod_regex
+# description  : If Prometheus agent is running as a K8s deployment, provide the pod regex to get resource usage stats
+#
+tmpl_var_prometheus_agent_pod_regex = ".*prometheus.*"

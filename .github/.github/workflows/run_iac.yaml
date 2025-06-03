@@ -1,0 +1,67 @@
+name: Deploy Alert Rules
+
+on:
+  push:
+    paths:
+      - 'workspace/**'
+      - '.github/workflows/run_iac.yaml'
+
+jobs:
+  install-and-run:
+    name: Install and run Last9 IaC
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: setup python env
+        run: |
+          python -m venv env
+          . ./env/bin/activate
+
+      - name: Install IaC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          . ./env/bin/activate
+          ./scripts/install_iac.sh
+
+      - name: Run IaC plan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_ASSUME_ROLE_ARN: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+          AWS_ASSUME_ROLE_EXTERNAL_ID: ${{ secrets.AWS_ASSUME_ROLE_EXTERNAL_ID }}
+          LAST9_BACKUP_S3_BUCKET: ${{ secrets.LAST9_BACKUP_S3_BUCKET }}
+          LAST9_API_CONFIG_STR: ${{ secrets.LAST9_API_CONFIG_STR }}
+        run: |
+          . ./env/bin/activate
+          ./scripts/run-iac.sh --run-all-files --plan
+
+      - name: Run IaC apply
+        if: github.ref == 'refs/heads/main'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_ASSUME_ROLE_ARN: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+          AWS_ASSUME_ROLE_EXTERNAL_ID: ${{ secrets.AWS_ASSUME_ROLE_EXTERNAL_ID }}
+          LAST9_BACKUP_S3_BUCKET: ${{ secrets.LAST9_BACKUP_S3_BUCKET }}
+          LAST9_API_CONFIG_STR: ${{ secrets.LAST9_API_CONFIG_STR }}
+        run: |
+          . ./env/bin/activate
+          ./scripts/run-iac.sh --run-all-files --apply

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -eou pipefail
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+set -x
+
+# shellcheck disable=2048
+# shellcheck disable=2086
+"$SCRIPT_DIR/enable-grafana-dashboard" --type vmagent --edit-config $*

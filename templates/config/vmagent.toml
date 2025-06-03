@@ -1,0 +1,64 @@
+# Common variables used in all sections
+[common]
+
+
+# Template variables used for patching vmagent alerts
+[alerts]
+#
+# variable     : tmpl_var_name_suffix
+# description  : unique name to identify your setup / environment. Update it if you have mutliple vmagents e.g. -vmagent-eu, -vmagent-in
+#
+tmpl_var_name_suffix = ""
+#
+# variable     : tmpl_var_vmagent_data_source
+# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+#
+tmpl_var_vmagent_data_source = "vmagent_data_source"
+#
+# variable     : tmpl_var_vmagent_metrics_label_key
+# description  : If you want to filter specific vmagents only provide the identifying label key used when scraping metrics.
+#
+tmpl_var_vmagent_metrics_label_key = "job"
+#
+# variable     : tmpl_var_vmagent_metrics_label_value_regex
+# description  : For `tmpl_var_vmagent_metrics_label_key` corresponding value.
+#
+tmpl_var_vmagent_metrics_label_value_regex =  ".*vmagent.*"
+#
+# variable     : tmpl_var_notification_slack_channel_name
+# description  : Slack channel to send alert notification. This channel must be configured as a notification channel in Last9.
+#
+tmpl_var_notification_slack_channel_name = "last9-cs-alerts"
+#
+# variable     : tmpl_var_notification_channel_mention
+# description  : Slack mentions to use in the notification.
+#
+tmpl_var_notification_channel_mention = "csalerts"
+
+# Template variables used for patching Grafana dashboards
+[grafana_dashboards]
+#
+# variable     : tmpl_var_name_suffix
+# description  : unique name to identify your setup / environment. Update it if you have mutliple vmagents e.g. -vmagent-eu, -vmagent-in
+#
+tmpl_var_name_suffix = ""
+#
+# variable     : tmpl_var_dashboard_tag
+# description  : dashboard tag to use to edit the dashboard. Update it if you have multiple vmagents e.g. vmagent-eu, vmagent-in
+#
+tmpl_var_dashboard_tag = "vmagent"
+#
+# variable     : tmpl_var_vmagent_data_source
+# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+#
+tmpl_var_vmagent_data_source = "vmagent_data_source"
+#
+# variable     : tmpl_var_vmagent_metrics_label_key
+# description  : If you want to filter specific vmagents only provide the identifying label key used when scraping metrics.
+#
+tmpl_var_vmagent_metrics_label_key = "job"
+#
+# variable     : tmpl_var_vmagent_metrics_label_value_regex
+# description  : For `tmpl_var_vmagent_metrics_label_key` corresponding value.
+#
+tmpl_var_vmagent_metrics_label_value_regex =  ".*vmagent.*"

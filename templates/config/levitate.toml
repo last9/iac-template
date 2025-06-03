@@ -1,0 +1,34 @@
+# Common variables used in all sections
+[common]
+
+
+# Template variables used for patching vmagent alerts
+[alerts]
+#
+# variable     : tmpl_var_name_suffix
+# description  : unique tag to identify your setup / environment.
+#
+tmpl_var_name_suffix = ""
+#
+# variable     : tmpl_var_vmagent_data_source
+# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+#
+tmpl_var_levitate_data_source = "levitate_data_source"
+#
+# variable     : tmpl_var_l9cluster_id
+# description  : Last9 Levitate cluster id. Check with Last9 for finding it out.
+#
+tmpl_var_l9cluster_id = "123123123"
+#
+# variable     : tmpl_var_notification_slack_channel_name
+# description  : Slack channel to send alert notification. This channel must be configured as a notification channel in Last9.
+#
+tmpl_var_notification_slack_channel_name = "last9-cs-alerts"
+#
+# variable     : tmpl_var_notification_channel_mention
+# description  : Slack mentions to use in the notification.
+#
+tmpl_var_notification_channel_mention = "csalerts"
+
+# Template variables used for patching Grafana dashboards
+[grafana_dashboards]

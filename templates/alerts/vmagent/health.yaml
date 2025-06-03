@@ -1,0 +1,125 @@
+entities:
+  - name: vmagent-alerts$tmpl_var_name_suffix
+    type: vmagent_monitoring
+    entity_class: alert-manager
+    data_source: $tmpl_var_vmagent_data_source
+    external_ref: alert-manager-ref-vmagent-alerts$tmpl_var_name_suffix
+    tags:
+    - last9_monitoring
+    indicators:
+      - name: Availability_Total_vmagents_A
+        query: count(sum by (job, instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}))
+      - name: Availability_Total_vmagents_loss_of_signal
+        query: absent(up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Availability_Total_vmagents_up/down_down
+        query: count(sum by (job, instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"} == 0))
+      - name: Availability_Total_vmagents_up/down_up
+        query: count(sum by (job, instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"} == 1))
+      - name: Availability_Total_availability_%_of_VMagents_A
+        query: count(sum by (job, instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) > 0) / count(sum by (job, instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})) * 100
+      - name: Availability_Total_availability_%_of_VMagents_loss_of_signal
+        query: absent(up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Availability_per_vmagent_uptime
+        query: sum by (job,instance) (up{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Remote_write_Connection_saturation_%_per_VMagent
+        query: clamp((sum(rate(vmagent_remotewrite_send_duration_seconds_total{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])) by (job, instance) / max(vmagent_remotewrite_queues{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) by(job, instance)) * 100,0,100)
+      - name: Remote_write_Latency_per_VMagent
+        query: histogram_quantile(0.99, sum(increase(vmagent_remotewrite_duration_seconds_bucket{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])) by (vmrange,job,instance))
+      - name: Remote_write_blocks_sent_per_vmagent
+        query: sum by (job,instance)(rate(vmagent_remotewrite_blocks_sent_total{}[5m]))
+      - name: Remote_write_bytes_written_per_vmagent
+        query: sum by (job, instance)(rate(vmagent_remotewrite_conn_bytes_written_total{}[5m]))
+      - name: Remote_write_Packets_dropped_per_VMagent
+        query: sum by (job,instance) (vmagent_remotewrite_packets_dropped_total{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Remote_write_Pending_data_bytes_per_VMagent
+        query: sum by (job,instance) (vmagent_remotewrite_pending_data_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Scraping_Latency_per_VMagent
+        query: sum by (job,instance) (vm_promscrape_scrape_duration_seconds_sum{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"} / vm_promscrape_scrape_duration_seconds_count{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Scraping_Throughput_per_VMagent
+        query: sum by (job, instance) (rate(vm_promscrape_scraped_samples_sum{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])) + sum by (job, instance)(rate(vmagent_rows_inserted_total{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m]))
+      - name: Scraping_targets_per_vmagent
+        query: (sum by (job) (vm_promscrape_targets{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}))
+      - name: Scraping_Targets_down_%_per_VMagent
+        query: (sum by (job,instance) (vm_promscrape_targets{status='down', $tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})/sum by (job, instance) (vm_promscrape_targets{status!='', $tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})) * 100
+      - name: Scraping_Flags_per_VMagent
+        query: (sum by (job) (flag{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}))
+      - name: Errors_&_warnings_Error_logs_per_VMagent
+        query: sum by (level,job) (increase(vm_log_messages_total{level="error",$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m]))
+      - name: Errors_&_warnings_Warnings_per_VMagent
+        query: sum by (level,job,instance) (increase(vm_log_messages_total{level="warn",$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m]))
+      - name: Host_resources_FDS_%_usage_per_vmagent
+        query: (sum by (job,instance) (process_open_fds{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})*100) / sum by (job,instance) (process_max_fds{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"})
+      - name: Host_resources_Memory_%_usage_per_vmagent
+        query: max(max_over_time(process_resident_memory_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])/vm_available_memory_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) by(job)
+      - name: Host_resources_Memory_usage_in_GB_per_VMagent
+        query: max_over_time(process_resident_memory_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])
+      - name: Host_resources_CPU_%_usage_per_VMagent
+        query: max(rate(process_cpu_seconds_total{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])/vm_available_cpu_cores{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) by(job,instance)* 100
+      - name: Resource_usage_>_90%_Vmagent_cpu_usage_>_90_%
+        query: (max(rate(process_cpu_seconds_total{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])/vm_available_cpu_cores{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) by(job,instance)*100) > 90
+      - name: Resource_usage_>_90%_Vmagent_memory_usage_>_90%
+        query: max(max_over_time(process_resident_memory_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}[1m])/vm_available_memory_bytes{$tmpl_var_vmagent_metrics_label_key=~"$tmpl_var_vmagent_metrics_label_value_regex"}) by(job) > 90
+      - name: Troubleshooting_Top_10_jobs_by_unique_samples_count_>_500_k
+        query: count(topk_max(10, sum(sum_over_time(scrape_series_added[5m])) by (job,instance)) > 500000) or 0
+
+    alert_rules:
+      - bad_minutes: 1
+        indicator: Availability_Total_availability_%_of_VMagents_A
+        less_than: 50
+        name: Vmagent Availability threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 90
+        indicator: Host_resources_CPU_%_usage_per_VMagent
+        name: CPU Usage threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 90
+        indicator: Host_resources_Memory_%_usage_per_vmagent
+        name: Memory Usage threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 30
+        indicator: Scraping_Latency_per_VMagent
+        name: Scraping latency threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 90
+        indicator: Host_resources_FDS_%_usage_per_vmagent
+        name: FDS Usage threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 35
+        indicator: Remote_write_Latency_per_VMagent
+        name: 'Remote write latency threshold breached '
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 75
+        indicator: Remote_write_Connection_saturation_%_per_VMagent
+        name: Connection saturation threshold breached
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 500000000
+        indicator: Remote_write_Pending_data_bytes_per_VMagent
+        name: 'pending bytes '
+        severity: breach
+        total_minutes: 10
+      - bad_minutes: 5
+        greater_than: 0
+        indicator: Troubleshooting_Top_10_jobs_by_unique_samples_count_>_500_k
+        name: Job count with unique samples > 500k
+        severity: breach
+        total_minutes: 10
+
+    notification_channels:
+      - name: $tmpl_var_notification_slack_channel_name
+        type: slack
+        severity: breach
+        mention: $tmpl_var_notification_channel_mention

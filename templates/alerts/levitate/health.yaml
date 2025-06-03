@@ -1,0 +1,104 @@
+entities:
+  - name: levitate-health-alerts$tmpl_var_name_suffix
+    entity_class: alert-manager
+    type: levitate_health_alert_manager$tmpl_var_name_suffix
+    data_source: $tmpl_var_levitate_data_source
+    external_ref: ext-ref-lev-health-alerts$tmpl_var_name_suffix
+    tags :
+     - last9_monitoring
+    indicators:
+      - name: write_errors
+        query: sum(increase(http_requests_duration_milliseconds_count{program=~"leve.*",status!~"0|2.*", per=~"write.*|publish.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])) by (status)
+      - name: write_availability
+        query: (sum(increase(http_requests_duration_milliseconds_count{program=~"leve.*",status=~"0|2.*",per=~"write.*|publish.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])) / sum(increase(http_requests_duration_milliseconds_count{program=~"leve.*",per=~"write.*|publish.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])))*100
+      - name: write_latency
+        query: histogram_quantile(0.99, sum(increase(http_requests_duration_milliseconds_bucket{program=~"leve.*", per=~"write.*|publish.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])) by (le))
+      - name: read_errors_422
+        query: sum(increase(http_requests_duration_milliseconds_count{program=~"leve.*",status=~"422",per=~"query.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])) by (status)
+      - name: read_errors_5xx
+        query: sum(increase(http_requests_duration_milliseconds_count{program=~"leve.*",status=~"5.*",per=~"query.*",l9cluster="$tmpl_var_l9cluster_id"}[1m])) by (status)
+      - name: read_latency
+        query: histogram_quantile(0.99, sum(increase(http_requests_duration_milliseconds_bucket{program=~"leve.*",per=~"query.*",l9cluster=~"$tmpl_var_l9cluster_id"}[1m])) by (le))
+      - name: cardinality_limited
+        query: count(topk(50, max(last9_promscaler_metric_cardinality{l6ecluster=~"$tmpl_var_l9cluster_id"}) by (metric_name)))
+      - name: cardinality_limited_early_warning
+        query: count(topk(50, max(last9_promscaler_metric_suspicious_cardinality{l6ecluster=~"$tmpl_var_l9cluster_id"}) by (metric_name)))
+      - name: samples_ingested
+        query: sum(increase(last9_promscaler_samples_received{l6ecluster=~"$tmpl_var_l9cluster_id"}[1m]))
+      - name: write_lag
+        query: sum(vmagent_remotewrite_pending_data_bytes{cluster="tsdb.last9.io"})
+      - name: bytes_dropped
+        query: sum(rate(vm_persistentqueue_bytes_dropped_total{cluster=~"tsdb.last9.io", container=~"vmagent|vmagent_bypass|vmagent-cardinal"}))
+    alert_rules:
+      - name: write_error_breach_alert
+        indicator: write_errors
+        greater_than: 10
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: write_availability_breach_alert
+        indicator: write_availability
+        less_than: 98
+        bad_minutes: 3
+        total_minutes: 5
+        severity: breach
+      - name: write_latency_breach_alert
+        indicator: write_latency
+        greater_than: 1250
+        bad_minutes: 8
+        total_minutes: 10
+        severity: breach
+      - name: read_errors_422_breach_alert
+        indicator: read_errors_422
+        greater_than: 1250
+        bad_minutes: 8
+        total_minutes: 10
+        severity: breach
+      - name: read_errors_5xx_breach_alert
+        indicator: read_errors_5xx
+        greater_than: 0
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: read_latency_breach_alert
+        indicator: read_latency
+        greater_than: 10000
+        bad_minutes: 8
+        total_minutes: 10
+        severity: breach
+      - name: cardinality_breach_alert
+        indicator: cardinality_limited
+        greater_than: 0
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: suspicious_cardinality_breach_alert
+        indicator: cardinality_limited_early_warning
+        greater_than: 0
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: samples_ingested_below_threshold_breach_alert
+        indicator: samples_ingested
+        less_than: 3000000
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: write_lag_breach_alert
+        indicator: write_lag
+        greater_than: 50000
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+      - name: bytes_dropped_breach_alert
+        indicator: bytes_dropped
+        greater_than: 0
+        bad_minutes: 2
+        total_minutes: 5
+        severity: breach
+
+    notification_channels:
+      - name: $tmpl_var_notification_slack_channel_name
+        type: slack
+        severity: breach
+        mention: $tmpl_var_notification_channel_mention

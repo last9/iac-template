@@ -1,0 +1,202 @@
+#!/bin/bash
+
+set -eou pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+function usage() {
+  if [ -n "$1" ]; then
+    echo >&2 -e "ERROR: $1\n"
+  fi
+  echo >&2 "Usage: $0 [-a alert_type] [-i input_file] [-o output_file]"
+  echo >&2 "  -t, --type               alert type"
+  echo >&2 "  -e, --edit-config        edit config"
+  echo >&2 "  -o, --output-name        output name to be used in workspace dir"
+  echo >&2 "  -i, --tmpl-vars-file     input file"
+  echo >&2 "  --overwrite              overwrite dashboard"
+  echo >&2 "  --no-overwrite           do not overwrite dashboard"
+  echo >&2 ""
+  echo >&2 "Example: LAST9_API_CONFIG_STR=\$(cat path_to_creds_file | jq -c) $0 --type alert_type --tmpl-vars-file path_to_user_template_vars_file --output-name output_name"
+}
+extra_opts=${extra_opts:-""}
+
+# parse params
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -t | --type)
+    alert_type="$2"
+    shift
+    shift
+    ;;
+  -e | --edit-config)
+    edit_config="1"
+    shift
+    ;;
+  -o | --output-name)
+    output_name="$2"
+    shift
+    shift
+    ;;
+  -i | --tmpl-vars-file)
+    user_template_vars_file="$2"
+    shift
+    shift
+    ;;
+  --overwrite)
+    extra_opts="$extra_opts --overwrite"
+    shift
+    ;;
+  --no-overwrite)
+    extra_opts="$extra_opts --no-overwrite"
+    shift
+    ;;
+  *)
+    usage "Unknown parameter passed: $1"
+    exit 1
+    ;;
+  esac done
+
+alert_type=${alert_type:-""}
+if [[ $alert_type == "" ]]; then
+  usage "alert_type empty or not specified"
+  exit 1
+fi
+
+edit_config=${edit_config:-"0"}
+
+output_name=${output_name:-""}
+if [[ "$output_name" == "" ]]; then
+  output_name="$alert_type"
+fi
+
+user_template_vars_file="${user_template_vars_file:-workspace/config/${output_name}.toml}"
+output_file="workspace/grafana-dashboards/$output_name/health.json"
+
+if [[ $alert_type != "vmagent" ]] && [[ $alert_type != "prometheus-agent" ]]; then
+  usage "Invalid alert_type=$alert_type specified"
+  exit 1
+fi
+
+config_file='.last9.config.json'
+env_vars_file="/tmp/.last9.config.sh"
+
+echo >&2 "------------------------"
+if [[ -f $config_file ]]; then
+  if ! "$SCRIPT_DIR/load-config.sh" --config-file "$config_file" --output-file "$env_vars_file" --cache-config; then
+    echo >&2 "ERROR: Failed to load config file $config_file"
+    exit 1
+  fi
+else
+  if ! "$SCRIPT_DIR/load-config.sh" --output-file "$env_vars_file"; then
+    echo >&2 "ERROR: Failed to load config from env vars"
+    exit 1
+  fi
+fi
+
+# shellcheck disable=1090
+source $env_vars_file
+
+echo >&2 "------------------------"
+# Validate loaded config
+if ! "$SCRIPT_DIR/validate-config.sh" --env-vars-file "$env_vars_file"; then
+  echo >&2 "ERROR: Failed to validate env vars file $env_vars_file"
+  exit 1
+fi
+echo >&2 "------------------------"
+
+# shellcheck disable=1090
+# To load assume role vars if any
+source $env_vars_file
+
+template_file="templates/grafana-dashboards/$alert_type/health.json"
+default_template_vars_file="templates/config/${alert_type}.toml"
+
+tmp_template_vars_file="/tmp/last9-iac-alert-templates/config/${output_name}.toml"
+mkdir -p "$(dirname "$tmp_template_vars_file")"
+
+if ! [[ -f "$user_template_vars_file" ]]; then
+  echo >&2 "STATUS: user_template_vars_file=$user_template_vars_file does not exist."
+
+  if [[ "$EDITOR" == "" ]]; then
+    echo >&2 "ERROR: EDITOR not set. Cannot create $user_template_vars_file"
+    exit 1
+  fi
+
+  echo >&2 "STATUS: Creating tmp_template_vars_file=$tmp_template_vars_file from default_template_vars_file=$default_template_vars_file"
+
+  if [[ -f "$tmp_template_vars_file" ]]; then
+    echo >&2 "STATUS: Found older version of tmp_template_vars_file=$tmp_template_vars_file - deleting it."
+  fi
+
+  mkdir -p "$(dirname "$tmp_template_vars_file")"
+
+  if ! cp "$default_template_vars_file" "$tmp_template_vars_file"; then
+    echo >&2 "ERROR: Failed to move template_vars_file=$default_template_vars_file to tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  echo >&2 "STATUS: Creating user_template_vars_file=$user_template_vars_file from tmp_template_vars_file=$tmp_template_vars_file"
+
+  # Record mtime before editing the file
+  mtime_before_edit=$(\stat "$tmp_template_vars_file" | grep 'Modify:')
+
+  if ! $EDITOR "$tmp_template_vars_file"; then
+    echo >&2 "ERROR: Failed to edit tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  mtime_after_edit=$(\stat "$tmp_template_vars_file" | grep 'Modify:')
+  if [[ "$mtime_before_edit" == "$mtime_after_edit" ]]; then
+    echo >&2 "ERROR: Aborting - user quit without saving tmp_template_vars_file=$tmp_template_vars_file"
+    exit 1
+  fi
+
+  if ! mv "$tmp_template_vars_file" "$user_template_vars_file"; then
+    echo >&2 "ERROR: Failed to copy tmp_template_vars_file=$tmp_template_vars_file to user_template_vars_file=$user_template_vars_file"
+    exit 1
+  fi
+  echo >&2 "STATUS: Created user_template_vars_file=$user_template_vars_file"
+
+else
+
+  echo >&2 "STATUS: user_template_vars_file=$user_template_vars_file exists. Using it."
+
+  if [[ "$edit_config" == "1" ]]; then
+    # Record mtime before editing the file
+    mtime_before_edit=$(\stat "$user_template_vars_file" | grep 'Modify:')
+
+    if ! $EDITOR "$user_template_vars_file"; then
+      echo >&2 "ERROR: Failed to edit user_template_vars_file=$user_template_vars_file"
+      exit 1
+    fi
+
+    mtime_after_edit=$(\stat "$user_template_vars_file" | grep 'Modify:')
+    if [[ "$mtime_before_edit" == "$mtime_after_edit" ]]; then
+      echo >&2 "ERROR: Aborting - user quit without saving user_template_vars_file=$user_template_vars_file"
+      exit 1
+    fi
+  fi
+fi
+
+mkdir -p "$(dirname "$output_file")"
+
+echo >&2 "STATUS: Generating alert_type=$alert_type grafana dashboard for output_name=$output_name"
+echo >&2 "STATUS: template_file=$template_file"
+echo >&2 "STATUS: template_vars_file=$user_template_vars_file"
+echo >&2 "STATUS: output_file=$output_file"
+
+export tmpl_var_dashboard_id="vmagent123"
+
+set -x
+python3 "$SCRIPT_DIR/patch_template.py" --tmpl-file "$template_file" --tmpl-vars-file "$user_template_vars_file" --tmpl-vars-file-section "grafana_dashboards" --no-ignore-missing-vars --log-level info >"$output_file"
+set +x
+# shellcheck disable=SC2181
+if [[ $? -ne 0 ]]; then
+  echo >&2 "ERROR: Failed to generate alert_type=$alert_type grafana dashboard for output_name=$output_name. Save the command executed, the terminal output and contact the Last9 team."
+  exit 1
+fi
+
+echo "-------------------------"
+set -x
+# shellcheck disable=2086
+python3 "$SCRIPT_DIR/create_grafana_dashboard.py" --input-file "$output_file" $extra_opts
+set +x
