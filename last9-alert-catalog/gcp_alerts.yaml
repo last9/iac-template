@@ -1,0 +1,242 @@
+entities:
+- name: GCP Alerts
+  external_ref: gcp-alerts
+  type: gcp-alerts
+  entity_class: alert-manager
+  description: "GCP Alerts: Database"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  - name: SQL_high_CPU_Warning
+    query: avg by (database_id) (cloudsql_googleapis_com_database_cpu_utilization)
+    unit: unit
+    type: custom
+    description: ""
+  - name: SQL_high_memory_utilization
+    query:  max by (database_id) (cloudsql_googleapis_com_database_memory_utilization)
+    unit: MB
+    type: custom
+    description: ""
+  - name: 'EXPR: Container_OOMKiller'
+    query: (kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1) and ignoring (reason) min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m])
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: K8s_PersistentVolumeClaim_Pending'
+    query: kube_persistentvolumeclaim_status_phase{phase="Pending"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: K8s_PersistentVolume_Error'
+    query: kube_persistentvolume_status_phase{phase=~"Failed|Pending", job="kube-state-metrics"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Kubernetes_Volume_Out_Of_DiskSpace'
+    query: (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes)* 100
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Ready'
+    query: kube_node_status_condition{condition="Ready", status="true"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Pod_In_CrashLoopBackOff'
+    query: increase(kube_pod_container_status_restarts_total[30m])
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Pod_Not_Ready'
+    query: sum(kube_pod_status_ready{condition=~"false", pod!~"grafana-backup-cron-job.*|prometheus-backup-cron-job.*"}) by (namespace, pod, cluster)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Pod_Not_Running'
+    query: min_over_time((sum(kube_pod_status_phase{phase=~"Pending|Unknown|Failed|Error", pod!~"grafana-backup-cron-job.*|prometheus-backup-cron-job.*"}) by (namespace, pod, phase, container))[15m:1m])
+    unit: count
+    type: custom
+    description: ""    
+  - name: SQL_high_CPU_Warning
+    query: avg by (database_id) (cloudsql_googleapis_com_database_cpu_utilization)
+    unit: unit
+    type: custom
+    description: ""
+  - name: SQL_high_memory_utilization
+    query: max by (database_id) (cloudsql_googleapis_com_database_memory_utilization)
+    unit: MB
+    type: custom
+    description: ""
+  ###### alert rules
+  alert_rules:
+  - name: SQL_high_memory_utilization
+    description: ""
+    indicator: SQL_high_memory_utilization
+    greater_than: 0.2
+    bad_minutes: 3
+    total_minutes: 3
+    severity: breach
+    expression: SQL_high_memory_utilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: SQL_high_CPU_Warning
+    description: ""
+    indicator: SQL_high_CPU_Warning
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 1
+    severity: breach
+    expression: SQL_high_CPU_Warning
+    is_disabled: false
+    group_timeseries_notifications: true
+    - name: Pod_Not_Ready
+    description: ""
+    indicator: 'EXPR: Pod_Not_Ready'
+    greater_than: 0
+    bad_minutes: 10
+    total_minutes: 10
+    severity: breach
+    expression: 'EXPR: Pod_Not_Ready'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Critical!, Kubernetes Pod is not ready'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}` is not ready!'
+      identifier: 'POD: {{ $labels.pod }} Namespace: {{ $labels.namespace }}'
+  - name: K8s_PersistentVolume_Error
+    description: ""
+    indicator: 'EXPR: K8s_PersistentVolume_Error'
+    greater_than: 0
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: K8s_PersistentVolume_Error'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Kubernetes PersistentVolume error on (instance
+        {{ $labels.instance }}). Persistent volume is in bad state.'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}`'
+      identifier: 'POD: {{ $labels.pod }} on {{ $labels.container }}'
+  - name: Kubernetes_Volume_Out_Of_DiskSpace
+    description: ""
+    indicator: 'EXPR: Kubernetes_Volume_Out_Of_DiskSpace'
+    less_than: 5
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: Kubernetes_Volume_Out_Of_DiskSpace'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Volume is almost full (< 10% left).'
+      details: '*Details*{{ printf "\n" }}• *Instance*: `{{ $labels.instance }}`{{
+        printf "\n" }}• *env:* `{{ $labels.env }}`{{ printf "\n" }}• *Private IP:*
+        `{{ $labels.PrivateIP }}`'
+      identifier: 'Kubernetes Volume out of disk space on Instance: {{ $labels.instance
+        }}'
+  - name: Node_Ready
+    description: ""
+    indicator: 'EXPR: Node_Ready'
+    equal_to: 0
+    bad_minutes: 2
+    total_minutes: 2
+    severity: threat
+    expression: 'EXPR: Node_Ready'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  Node {{ $labels.node }} has been unready for a
+        long time.'
+      details: '*Details*{{ printf "\n" }}• *Instance*: `{{ $labels.instance }}`{{
+        printf "\n" }}• *env:* `{{ $labels.env }}`{{ printf "\n" }}• *Private IP:*
+        `{{ $labels.PrivateIP }}`'
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: Pod_In_CrashLoopBackOff
+    description: ""
+    indicator: 'EXPR: Pod_In_CrashLoopBackOff'
+    greater_than: 3
+    bad_minutes: 10
+    total_minutes: 10
+    severity: breach
+    expression: 'EXPR: Pod_In_CrashLoopBackOff'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Critical!, Kubernetes Pod was restarted `{{ $value
+        }}` times within last 30 minutes.'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}` is restarting
+        frequently'
+      identifier: 'POD: {{ $labels.pod }} in namespace {{ $labels.namespace }}'
+  - name: K8s_PersistentVolumeClaim_Pending
+    description: ""
+    indicator: 'EXPR: K8s_PersistentVolumeClaim_Pending'
+    equal_to: 1
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: K8s_PersistentVolumeClaim_Pending'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: PersistentVolumeClaim {{ $labels.namespace }}/{{
+        $labels.persistentvolumeclaim }} is pending'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}`'
+      identifier: 'POD: {{ $labels.pod }} on {{ $labels.container }}'
+  - name: Pod_Not_Running
+    description: ""
+    indicator: 'EXPR: Pod_Not_Running'
+    greater_than: 0
+    bad_minutes: 3
+    total_minutes: 3
+    severity: breach
+    expression: 'EXPR: Pod_Not_Running'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Critical!, Kubernetes Pod has been in a non-ready
+        state for longer than 15 minutes.'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}`'
+      identifier: 'POD: {{ $labels.pod }} in namespace {{ $labels.namespace }}'
+  - name: Container_OOMKiller
+    description: ""
+    indicator: 'EXPR: Container_OOMKiller'
+    greater_than: 0
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: Container_OOMKiller'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Kubernetes container oom killer!. Container {{
+        $labels.container }} in pod {{ $labels.namespace }}/{{ $labels.pod }} has
+        been OOMKilled {{ $value }} times in the last 10 minutes..'
+      details: '*Details*{{ printf "\n" }}• *POD*: `{{ $labels.pod }}` is OMMKilled!'
+      identifier: 'POD: {{ $labels.pod }} Namespace: {{ $labels.namespace }}'
+  - name: SQL_high_memory_utilization
+    description: ""
+    indicator: SQL_high_memory_utilization
+    greater_than: 0.2
+    bad_minutes: 3
+    total_minutes: 3
+    severity: breach
+    expression: SQL_high_memory_utilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: SQL_high_CPU_Warning
+    description: ""
+    indicator: SQL_high_CPU_Warning
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 1
+    severity: breach
+    expression: SQL_high_CPU_Warning
+    is_disabled: false
+    group_timeseries_notifications: true
+  notification_channels: []

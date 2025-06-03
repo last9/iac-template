@@ -1,0 +1,111 @@
+entities:
+- name: Infra Monitoring - AWS ElastiCache Redis
+  external_ref: aws-redis-monitoring
+  type: redis-alerts
+  entity_class: alert-manager
+  description: "AWS Redis Alerts: Memory, Connections, Cache Hits/Misses, Evictions"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - AWS
+  - Redis
+  - ElastiCache
+  links: []
+  ###### indicators
+  indicators:
+  - name: HighMemoryUsage
+    query: avg by (CacheClusterId) (aws_elasticache_database_memory_usage_percentage)
+    unit: percent
+    type: custom
+    description: Redis memory usage as a percentage of total available memory
+  - name: HighCPUUtilization
+    query: avg by (CacheClusterId) (aws_elasticache_engine_cpu_utilization)
+    unit: percent
+    type: custom
+    description: CPU utilization for Redis instances
+  - name: ConnectionCount
+    query: max by (CacheClusterId) (aws_elasticache_curr_connections)
+    unit: count
+    type: custom
+    description: Number of client connections to Redis
+  - name: CacheMissRate
+    query: avg by (CacheClusterId) (aws_elasticache_cache_miss_rate)
+    unit: count
+    type: custom
+    description: Rate of cache misses as a proportion of total lookups
+  - name: HighEvictionRate
+    query: sum by (CacheClusterId) (aws_elasticache_evictions)
+    unit: count
+    type: custom
+    description: Number of keys that have been evicted due to memory limits
+  - name: ReplicationLag
+    query: max by (CacheClusterId) (aws_elasticache_replication_lag)
+    unit: seconds
+    type: custom
+    description: How far behind replicas are from the primary node
+  ###### alert rules
+  alert_rules:
+  - name: Critical Redis Memory Usage
+    description: "Redis memory usage approaching capacity"
+    indicator: HighMemoryUsage
+    greater_than: 85
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: HighMemoryUsage
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Redis CPU Utilization
+    description: "Redis CPU utilization exceeding threshold"
+    indicator: HighCPUUtilization
+    greater_than: 80
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: HighCPUUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Redis Connection Saturation
+    description: "Redis approaching connection limit"
+    indicator: ConnectionCount
+    greater_than: 5000
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: ConnectionCount
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Cache Miss Rate
+    description: "Redis experiencing elevated cache miss rate"
+    indicator: CacheMissRate
+    greater_than: 1000
+    bad_minutes: 10
+    total_minutes: 15
+    severity: warning
+    expression: CacheMissRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Excessive Redis Key Evictions
+    description: "Redis evicting keys at a high rate due to memory pressure"
+    indicator: HighEvictionRate
+    greater_than: 100
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: HighEvictionRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Replication Lag
+    description: "Redis replication falling behind primary"
+    indicator: ReplicationLag
+    greater_than: 10
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: ReplicationLag
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

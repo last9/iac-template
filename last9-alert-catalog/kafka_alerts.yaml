@@ -1,0 +1,217 @@
+entities:
+- name: Kafka Alerts
+  external_ref: kafka-alerts
+  type: kafka-alerts
+  entity_class: alert-manager
+  description: "Kafka Alerts"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  - name: 'EXPR: KafkaConsumer-network-request-metrics'
+    query: max(kafka_network_requestmetrics_requestqueuetimems) by (instance, request,
+      quantile)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaConsumer-network-response-metrics'
+    query: max(kafka_network_requestmetrics_responsequeuetimems) by (instance, request,
+      quantile)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaConsumersGroup'
+    query: sum(kafka_consumergroup_lag) by (consumergroup)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaConsumersGroup_de_team_custom_alert'
+    query: sum(kafka_consumergroup_lag) by (consumergroup)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaProducerGroup'
+    query: sum(kafka_producergroup_lag) by (producergroup)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaProducerGroup-network-response-metrics'
+    query: max(kafka_network_requestmetrics_responsequeuetimems) by (instance, request,
+      quantile)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: KafkaProducer-network-request-metrics'
+    query: max(kafka_network_requestmetrics_requestqueuetimems) by (instance, request,
+      quantile)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Kafka-zookeeperclientmetrics'
+    query: avg(kafka_server_zookeeperclientmetrics_zookeeperrequestlatencyms) by (instance,quantile)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: replication-replicamanager'
+    query: sum(kafka_server_replicamanager_underreplicatedpartitions) by (instance)
+    unit: count
+    type: custom
+    description: ""
+  ###### alert rules
+  alert_rules:
+  - name: KafkaProducerGroup
+    description: ""
+    indicator: 'EXPR: KafkaProducerGroup'
+    greater_than: 50
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaProducerGroup'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} kafka_producergroup_lag
+        > 50 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *producergroup:* `{{ $labels.producergroup
+        }}` {{ printf "\n" }}• *partition:* `{{ $labels.partition }}` {{ printf "\n"
+        }}• *topic:* `{{ $labels.topic }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: Kafka-zookeeperclientmetrics
+    description: ""
+    indicator: 'EXPR: Kafka-zookeeperclientmetrics'
+    greater_than: 0
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: Kafka-zookeeperclientmetrics'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} Kafka-zookeeperclientmetrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` {{
+        printf "\n" }}• *request:* `{{ $labels.request }}` {{ printf "\n" }}• *quantile:*
+        `{{ $labels.quantile }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaConsumer-network-request-metrics
+    description: ""
+    indicator: 'EXPR: KafkaConsumer-network-request-metrics'
+    greater_than: 50
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaConsumer-network-request-metrics'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} KafkaConsumer-network-requestmetrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` {{
+        printf "\n" }}• *request:* `{{ $labels.request }}` {{ printf "\n" }}• *quantile:*
+        `{{ $labels.quantile }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaProducer-network-request-metrics
+    description: ""
+    indicator: 'EXPR: KafkaProducer-network-request-metrics'
+    greater_than: 50
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaProducer-network-request-metrics'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} KafkaProducer-network-request-metrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` {{
+        printf "\n" }}• *request:* `{{ $labels.request }}` {{ printf "\n" }}• *quantile:*
+        `{{ $labels.quantile }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: replication-replicamanager
+    description: ""
+    indicator: 'EXPR: replication-replicamanager'
+    greater_than_eq: 1
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: replication-replicamanager'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} KafkaConsumer-network-response-metrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaProducerGroup-network-response-metrics
+    description: ""
+    indicator: 'EXPR: KafkaProducerGroup-network-response-metrics'
+    greater_than: 50
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaProducerGroup-network-response-metrics'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} KafkaProducerGroup-network-response-metrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` {{
+        printf "\n" }}• *request:* `{{ $labels.request }}` {{ printf "\n" }}• *quantile:*
+        `{{ $labels.quantile }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaConsumersGroup_de_team_custom_alert
+    description: ""
+    indicator: 'EXPR: KafkaConsumersGroup_de_team_custom_alert'
+    greater_than: 10000
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaConsumersGroup_de_team_custom_alert'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} kafka_consumergroup_lag
+        > 50 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *consumergroup:* `{{ $labels.consumergroup
+        }}` {{ printf "\n" }}• *partition:* `{{ $labels.partition }}` {{ printf "\n"
+        }}• *topic:* `{{ $labels.topic }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaConsumer-network-response-metrics
+    description: ""
+    indicator: 'EXPR: KafkaConsumer-network-response-metrics'
+    greater_than: 50
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaConsumer-network-response-metrics'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} KafkaConsumer-network-response-metrics
+        > 1 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *instance:* `{{ $labels.instance }}` {{
+        printf "\n" }}• *request:* `{{ $labels.request }}` {{ printf "\n" }}• *quantile:*
+        `{{ $labels.quantile }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  - name: KafkaConsumersGroup
+    description: ""
+    indicator: 'EXPR: KafkaConsumersGroup'
+    greater_than: 50000
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: KafkaConsumersGroup'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*:  {{ $labels.instance }} kafka_consumergroup_lag
+        > 50 on Instance `{{ $labels.instance }}`'
+      details: '*Details*{{ printf "\n" }}• *consumergroup:* `{{ $labels.consumergroup
+        }}` {{ printf "\n" }}• *partition:* `{{ $labels.partition }}` {{ printf "\n"
+        }}• *topic:* `{{ $labels.topic }}`  '
+      identifier: 'Instance: {{ $labels.instance }}'
+  notification_channels: []

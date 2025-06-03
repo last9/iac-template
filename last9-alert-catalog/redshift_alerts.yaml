@@ -1,0 +1,99 @@
+entities:
+- name: Prod-RedShift-Alerts
+  external_ref: Prod-RedShift-Alerts-alert-manager-alert-manager
+  type: redshift-alerts
+  entity_class: alert-manager
+  description: "Redshift Alerts"
+  data_source: default  
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  - name: 'EXPR: RedShift_High_CPU_Utilization_Warining'
+    query: aws_redshift_cpuutilization_average
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: RedShift_High_Database_Connection'
+    query: aws_redshift_database_connections_average
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: RedShift_Unhealthy_Status'
+    query: aws_redshift_health_status_average
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: rudderstack_failed_requests'
+    query: sum(rate(gateway_write_key_failed_requests[5m]))
+    unit: count
+    type: custom
+    description: ""
+  alert_rules:
+  - name: rudderstack_failed_requests
+    description: ""
+    indicator: 'EXPR: rudderstack_failed_requests'
+    greater_than: 0
+    bad_minutes: 0
+    total_minutes: 0
+    severity: breach
+    expression: 'EXPR: rudderstack_failed_requests'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: requests failing for rudderstack `{{ $labels.instance
+        }}`. Value : `{{ $value }}` == 0.'
+      details: '*Details*{{ printf "\n" }}• *Cluster:* `{{ $labels.instance }}`.'
+      identifier: 'Cluster: {{ $labels.instance }}'
+  - name: RedShift_High_CPU_Utilization_Warining
+    description: ""
+    indicator: 'EXPR: RedShift_High_CPU_Utilization_Warining'
+    greater_than: 80
+    bad_minutes: 2
+    total_minutes: 2
+    severity: threat
+    expression: 'EXPR: RedShift_High_CPU_Utilization_Warining'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: High cpu usage in Cluster `{{ $labels.cluster_identifier
+        }}`. Value : `{{ $value }}` > 80%.'
+      details: '*Details*{{ printf "\n" }}• *Cluster:* `{{ $labels.cluster_identifier
+        }}`.'
+      identifier: 'Cluster: {{ $labels.cluster_identifier }}'
+  - name: RedShift_High_Database_Connection
+    description: ""
+    indicator: 'EXPR: RedShift_High_Database_Connection'
+    greater_than: 310
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: RedShift_High_Database_Connection'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: High Database connections in Cluster `{{ $labels.cluster_identifier
+        }}`. Value : `{{ $value }}` > 100.'
+      details: '*Details*{{ printf "\n" }}• *Cluster:* `{{ $labels.cluster_identifier
+        }}`.'
+      identifier: 'Cluster: {{ $labels.cluster_identifier }}'
+  - name: RedShift_Unhealthy_Status
+    description: ""
+    indicator: 'EXPR: RedShift_Unhealthy_Status'
+    equal_to: 0
+    bad_minutes: 2
+    total_minutes: 2
+    severity: breach
+    expression: 'EXPR: RedShift_Unhealthy_Status'
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      description: '*Description*: Unhealthy Cluster `{{ $labels.cluster_identifier
+        }}`. Value : `{{ $value }}` == 0.'
+      details: '*Details*{{ printf "\n" }}• *Cluster:* `{{ $labels.cluster_identifier
+        }}`.'
+      identifier: 'Cluster: {{ $labels.cluster_identifier }}'
+  notification_channels: []

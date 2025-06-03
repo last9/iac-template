@@ -1,0 +1,236 @@
+entities:
+- name: Jenkins Monitoring
+  external_ref: jenkins-monitoring
+  type: jenkins-alerts
+  entity_class: alert-manager
+  description: "Jenkins Alerts: Build failures, Queue backlog, Agent issues, Performance degradation"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  - Jenkins
+  - CI/CD
+  links: []
+  ###### indicators
+  indicators:
+  - name: Build Failure Rate
+    query: (increase(jenkins_builds_failure_build_count[10m]) / increase(jenkins_builds_total[10m])) * 100
+    unit: "%"
+    type: custom
+    description: "Measures the percentage of failed builds over the last 10 minutes, indicating CI/CD pipeline health and stability."
+  - name: Queue Size
+    query: jenkins_queue_size_value
+    unit: ""
+    type: custom
+    description: "Tracks the number of jobs waiting in the build queue, indicating potential bottlenecks or resource constraints."
+  - name: Available Executors
+    query: jenkins_executor_available
+    unit: ""
+    type: custom
+    description: "Monitors the number of available build executors, essential for maintaining build capacity and throughput."
+  - name: Agent Availability
+    query: (jenkins_agents_online / jenkins_agents_total) * 100
+    unit: "%"
+    type: custom
+    description: "Tracks the percentage of online agents, critical for distributed build capacity and system reliability."
+  - name: Build Duration P95
+    query: jenkins_builds_duration_milliseconds_summary{quantile="0.95"} / 1000 / 60
+    unit: "min"
+    type: custom
+    description: "Monitors the 95th percentile build duration in minutes, helping identify performance degradation and long-running builds."
+  - name: Queue Wait Time P95
+    query: jenkins_builds_waiting_time_milliseconds_summary{quantile="0.95"} / 1000
+    unit: "s"
+    type: custom
+    description: "Tracks the 95th percentile queue wait time in seconds, indicating resource availability and system efficiency."
+  - name: Pipeline Step Failures
+    query: rate(jenkins_pipeline_step_failures_total[5m]) * 60
+    unit: "failures/min"
+    type: custom
+    description: "Measures the rate of pipeline step failures per minute, helping identify specific pipeline issues and bottlenecks."
+  - name: Build Throughput
+    query: increase(jenkins_builds_total[1h])
+    unit: "builds/hour"
+    type: custom
+    description: "Tracks the number of builds completed per hour, indicating overall system productivity and capacity utilization."
+  ###### alert rules
+  alert_rules:
+  - name: High Build Failure Rate Threat
+    description: 'Threat: High build failure rate detected - {{ printf "%.1f" $value }}% of builds failing'
+    indicator: Build Failure Rate
+    greater_than: 20
+    bad_minutes: 2
+    total_minutes: 5
+    severity: threat
+    expression: Build Failure Rate
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Logs: https://app.last9.io/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24contains%22%3A%5B%22message%22%2C%22jenkins%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Jenkins Instance: "{{ $labels.instance }}"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring
+  - name: Critical Build Failure Rate Breach
+    description: 'Breach: Critical build failure rate - {{ printf "%.1f" $value }}% of builds failing, immediate attention required'
+    indicator: Build Failure Rate
+    greater_than: 50
+    bad_minutes: 1
+    total_minutes: 2
+    severity: breach
+    expression: Build Failure Rate
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Logs: https://app.last9.io/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24contains%22%3A%5B%22message%22%2C%22jenkins%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Jenkins Instance: "{{ $labels.instance }}"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring
+  - name: Build Queue Backlog Alert
+    description: 'Warning: Build queue backlog detected - {{ $value }} jobs waiting in queue'
+    indicator: Queue Size
+    greater_than: 10
+    bad_minutes: 3
+    total_minutes: 5
+    severity: threat
+    expression: Queue Size
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Queue: "{{ $labels.instance }}/queue/"
+      Queue Size: "{{ $value }} jobs"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring+Jenkins
+  - name: Critical Queue Backlog Breach
+    description: 'Breach: Critical queue backlog - {{ $value }} jobs waiting, system may be overwhelmed'
+    indicator: Queue Size
+    greater_than: 25
+    bad_minutes: 2
+    total_minutes: 3
+    severity: breach
+    expression: Queue Size
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Queue: "{{ $labels.instance }}/queue/"
+      Queue Size: "{{ $value }} jobs"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring+Jenkins
+  - name: No Available Executors Alert
+    description: 'Critical: No build executors available - all executors are busy or offline'
+    indicator: Available Executors
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 2
+    severity: breach
+    expression: Available Executors == 0
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Nodes: "{{ $labels.instance }}/computer/"
+      Available Executors: "{{ $value }}"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring+Jenkins
+  - name: Low Agent Availability Alert
+    description: 'Warning: Low agent availability - {{ printf "%.1f" $value }}% of agents online'
+    indicator: Agent Availability
+    greater_than: 80
+    bad_minutes: 3
+    total_minutes: 5
+    severity: threat
+    expression: Agent Availability
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Nodes: "{{ $labels.instance }}/computer/"
+      Agent Availability: "{{ printf \"%.1f\" $value }}%"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring+Jenkins
+  - name: Critical Agent Availability Breach
+    description: 'Breach: Critical agent availability - {{ printf "%.1f" $value }}% of agents online, system capacity severely impacted'
+    indicator: Agent Availability
+    greater_than: 50
+    bad_minutes: 2
+    total_minutes: 3
+    severity: breach
+    expression: Agent Availability
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Nodes: "{{ $labels.instance }}/computer/"
+      Agent Availability: "{{ printf \"%.1f\" $value }}%"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Monitoring+Jenkins
+  - name: Long Build Duration Alert
+    description: 'Warning: Builds taking longer than usual - P95 duration is {{ printf "%.1f" $value }} minutes'
+    indicator: Build Duration P95
+    greater_than: 30
+    bad_minutes: 3
+    total_minutes: 10
+    severity: threat
+    expression: Build Duration P95
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Jobs: "{{ $labels.instance }}"
+      P95 Duration: "{{ printf \"%.1f\" $value }} minutes"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Performance+Monitoring
+  - name: Excessive Queue Wait Time Alert
+    description: 'Warning: Jobs waiting too long in queue - P95 wait time is {{ printf "%.0f" $value }} seconds'
+    indicator: Queue Wait Time P95
+    greater_than: 300
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: Queue Wait Time P95
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Queue: "{{ $labels.instance }}/queue/"
+      P95 Wait Time: "{{ printf \"%.0f\" $value }} seconds"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Performance+Monitoring
+  - name: High Pipeline Step Failure Rate Alert
+    description: 'Warning: High pipeline step failure rate - {{ printf "%.1f" $value }} failures per minute'
+    indicator: Pipeline Step Failures
+    greater_than: 2
+    bad_minutes: 3
+    total_minutes: 5
+    severity: threat
+    expression: Pipeline Step Failures
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Pipeline Logs: https://app.last9.io/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24contains%22%3A%5B%22message%22%2C%22pipeline%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Failure Rate: "{{ printf \"%.1f\" $value }} failures/min"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Pipeline+Monitoring
+  - name: Low Build Throughput Alert
+    description: 'Warning: Low build throughput detected - only {{ printf "%.0f" $value }} builds completed in the last hour'
+    indicator: Build Throughput
+    greater_than: 10
+    bad_minutes: 15
+    total_minutes: 30
+    severity: threat
+    expression: Build Throughput
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check Jenkins Dashboard: https://app.last9.io/dashboards/jenkins-monitoring-dashboard
+      Check Jenkins Status: "{{ $labels.instance }}"
+      Throughput: "{{ printf \"%.0f\" $value }} builds/hour"
+    runbook:
+      link: https://wiki.jenkins.io/display/JENKINS/Performance+Monitoring
+      
+  notification_channels: []

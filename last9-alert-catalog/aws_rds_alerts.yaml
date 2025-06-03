@@ -1,0 +1,157 @@
+## NOT TESTED
+entities:
+- name: Infra Monitoring - AWS RDS
+  external_ref: aws-rds-monitoring
+  type: rds-alerts
+  entity_class: alert-manager
+  description: "AWS RDS Alerts: CPU, Memory, Storage, Connections, Latency"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - AWS
+  - RDS
+  - Database
+  links: []
+  ###### indicators
+  indicators:
+  - name: HighCPUUtilization
+    query: avg by (DBInstanceIdentifier) (aws_rds_cpu_utilization_average)
+    unit: percent
+    type: custom
+    description: CPU utilization of the RDS instance
+  - name: LowFreeableMemory
+    query: min by (DBInstanceIdentifier) (aws_rds_freeable_memory_average)
+    unit: bytes
+    type: custom
+    description: Amount of available random access memory on RDS instance
+  - name: LowStorageSpace
+    query: min by (DBInstanceIdentifier) (aws_rds_free_storage_space_average)
+    unit: bytes
+    type: custom
+    description: Available storage space on RDS instance
+  - name: HighDatabaseConnections
+    query: max by (DBInstanceIdentifier) (aws_rds_database_connections_average)
+    unit: count
+    type: custom
+    description: Number of database connections in use
+  - name: StorageSpaceUtilization
+    query: (1 - (aws_rds_free_storage_space_average / aws_rds_allocated_storage_average)) * 100
+    unit: percent
+    type: custom
+    description: Percentage of allocated storage space being used
+  - name: ReadLatency
+    query: avg by (DBInstanceIdentifier) (aws_rds_read_latency_average)
+    unit: seconds
+    type: custom
+    description: Average amount of time taken per disk I/O read operation
+  - name: WriteLatency
+    query: avg by (DBInstanceIdentifier) (aws_rds_write_latency_average)
+    unit: seconds
+    type: custom
+    description: Average amount of time taken per disk I/O write operation
+  - name: ReplicaLag
+    query: max by (DBInstanceIdentifier) (aws_rds_replica_lag_average)
+    unit: seconds
+    type: custom
+    description: Time lag in seconds for read replicas
+  - name: SwapUsage
+    query: max by (DBInstanceIdentifier) (aws_rds_swap_usage_average)
+    unit: bytes
+    type: custom
+    description: Amount of swap space used on the RDS instance
+  ###### alert rules
+  alert_rules:
+  - name: Critical RDS CPU Utilization
+    description: "RDS instance CPU utilization exceeding critical threshold"
+    indicator: HighCPUUtilization
+    greater_than: 85
+    bad_minutes: 10
+    total_minutes: 15
+    severity: breach
+    expression: HighCPUUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Low RDS Memory
+    description: "RDS instance running low on available memory"
+    indicator: LowFreeableMemory
+    less_than: 1073741824  # 1GB in bytes
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: LowFreeableMemory
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: RDS Storage Space Critical
+    description: "RDS instance critically low on storage space"
+    indicator: LowStorageSpace
+    less_than: 10737418240  # 10GB in bytes
+    bad_minutes: 10
+    total_minutes: 15
+    severity: breach
+    expression: LowStorageSpace
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Database Connection Count
+    description: "Unusually high number of database connections"
+    indicator: HighDatabaseConnections
+    greater_than: 100  # Adjust based on your instance size and workload
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: HighDatabaseConnections
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Storage Space Utilization Warning
+    description: "RDS storage utilization approaching capacity"
+    indicator: StorageSpaceUtilization
+    greater_than: 85
+    bad_minutes: 15
+    total_minutes: 20
+    severity: warning
+    expression: StorageSpaceUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Read Latency
+    description: "RDS experiencing elevated read latency"
+    indicator: ReadLatency
+    greater_than: 0.02  # 20ms
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: ReadLatency
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Write Latency
+    description: "RDS experiencing elevated write latency"
+    indicator: WriteLatency
+    greater_than: 0.02  # 20ms
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: WriteLatency
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Replica Lag
+    description: "RDS read replica significantly behind primary instance"
+    indicator: ReplicaLag
+    greater_than: 30
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: ReplicaLag
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Excessive Swap Usage
+    description: "RDS instance using swap space indicating memory pressure"
+    indicator: SwapUsage
+    greater_than: 536870912  # 512MB in bytes
+    bad_minutes: 10
+    total_minutes: 15
+    severity: breach
+    expression: SwapUsage
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

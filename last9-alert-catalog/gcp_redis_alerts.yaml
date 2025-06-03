@@ -1,0 +1,111 @@
+entities:
+- name: GCP Redis Alerts  
+  external_ref: redis-alerts
+  type: redis-alerts
+  entity_class: alert-manager
+  description: "Redis Alerts"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  - name: clients connected
+    query: avg by (instance_id) redis_googleapis_com_clients_connected
+    unit: Unit
+    type: custom
+    description: ""
+  - name: gcp Redis Uptime
+    query: avg by (instance_id) redis_googleapis_com_server_uptime
+    unit: Unit
+    type: custom
+    description: ""
+  - name: High memory usage
+    query: avg by (instance_id) redis_googleapis_com_stats_memory_usage
+    unit: Unit
+    type: custom
+    description: ""
+  - name: Managed Redis Uptime
+    query: avg by (host_name) redis_uptime_seconds_total
+    unit: count
+    type: custom
+    description: ""
+  - name: recovery attempts
+    query: avg by (instance_id) redis_googleapis_com_rdb_recovery_attempts_since_last_success
+    unit: Unit
+    type: custom
+    description: ""
+  - name: Redis Memory Used Bytes
+    query: avg by (host_name) redis_memory_used_bytes
+    unit: count
+    type: custom
+    description: ""
+  - name: snapshot elapsed time
+    query: avg by (instance_id) redis_googleapis_com_rdb_snapshot_elapsed_time
+    unit: Unit
+    type: custom
+    description: ""
+  alert_rules:
+  - name: Redis Memory Used bytes
+    description: ""
+    indicator: Redis Memory Used Bytes
+    greater_than: 3e+06
+    bad_minutes: 3
+    total_minutes: 5
+    severity: breach
+    expression: Redis Memory Used Bytes
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: client alert
+    description: ""
+    indicator: clients connected
+    greater_than: 2000
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: clients connected
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: recovery attempts
+    description: ""
+    indicator: recovery attempts
+    greater_than: 5
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: recovery attempts
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: snapshot elapsed time
+    description: ""
+    indicator: snapshot elapsed time
+    greater_than: 5
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: snapshot elapsed time
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: GCP Redis uptime
+    description: ""
+    indicator: gcp Redis Uptime
+    equal_to: 0
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: gcp Redis Uptime
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Managed Redis Uptime
+    description: ""
+    indicator: Managed Redis Uptime
+    equal_to: 0
+    bad_minutes: 1
+    total_minutes: 5
+    severity: breach
+    expression: Managed Redis Uptime
+    is_disabled: false
+    group_timeseries_notifications: true
+  notification_channels: []

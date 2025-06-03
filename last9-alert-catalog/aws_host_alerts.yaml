@@ -1,0 +1,80 @@
+entities:
+- name: Infra Monitoring - AWS Hosts
+  external_ref: aws-host-monitoring
+  type: infra-alerts
+  entity_class: alert-manager
+  description: "AWS Host Alerts: CPU, Memory, Disk, Network metrics"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - AWS
+  - EC2
+  links: []
+  ###### indicators
+  indicators:
+  - name: HighCPUUtilization
+    query: avg by (InstanceId) (aws_ec2_cpu_utilization_average)
+    unit: percent
+    type: custom
+    description: Average CPU utilization across AWS EC2 instances
+  - name: LowDiskSpace
+    query: min by (InstanceId, MountPoint) (aws_ec2_disk_free_storage_space_average)
+    unit: bytes
+    type: custom
+    description: Available disk space on EC2 instances by mount point
+  - name: HighMemoryUtilization
+    query: avg by (InstanceId) (aws_ec2_memory_utilization_average)
+    unit: percent
+    type: custom
+    description: Average memory utilization across AWS EC2 instances
+  - name: NetworkPacketLoss
+    query: avg by (InstanceId) (aws_ec2_network_packets_drop_count_average)
+    unit: count
+    type: custom
+    description: Network packet loss count for EC2 instances
+  ###### alert rules
+  alert_rules:
+  - name: Critical CPU Utilization
+    description: "CPU utilization exceeding critical threshold"
+    indicator: HighCPUUtilization
+    greater_than: 85
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: HighCPUUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Low Disk Space Warning
+    description: "Low available disk space on EC2 instances"
+    indicator: LowDiskSpace
+    less_than: 10737418240  # 10GB in bytes
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: LowDiskSpace
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Memory Utilization
+    description: "Memory utilization exceeding threshold"
+    indicator: HighMemoryUtilization
+    greater_than: 90
+    bad_minutes: 8
+    total_minutes: 10
+    severity: breach
+    expression: HighMemoryUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Elevated Network Packet Loss
+    description: "Elevated network packet loss detected"
+    indicator: NetworkPacketLoss
+    greater_than: 100
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: NetworkPacketLoss
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

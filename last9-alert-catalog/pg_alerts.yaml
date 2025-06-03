@@ -1,0 +1,141 @@
+## NOT TESTED
+entities:
+- name: Infra Monitoring - PostgreSQL
+  external_ref: postgresql-monitoring
+  type: pg-alerts
+  entity_class: alert-manager
+  description: "PostgreSQL Alerts: Connections, Performance, Replication, Storage"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - PostgreSQL
+  - Database
+  links: []
+  ###### indicators
+  indicators:
+  - name: HighConnectionUtilization
+    query: sum(pg_stat_activity_count{}) / pg_settings_max_connections{} * 100
+    unit: percent
+    type: custom
+    description: Percentage of maximum allowed connections currently in use
+  - name: LongRunningTransactions
+    query: count by (datname) (pg_stat_activity_max_tx_duration{} >= 300)
+    unit: count
+    type: custom
+    description: Count of transactions running longer than 5 minutes
+  - name: HighDatabaseSize
+    query: max by (datname) (pg_database_size_bytes{})
+    unit: bytes
+    type: custom
+    description: Size of PostgreSQL databases in bytes
+  - name: DeadlockRate
+    query: rate(pg_stat_database_deadlocks_total{}[5m])
+    unit: count
+    type: custom
+    description: Rate of deadlocks detected per database
+  - name: SlowQueries
+    query: increase(pg_stat_statements_calls{query_time_ms > 1000}[5m])
+    unit: count
+    type: custom
+    description: Count of queries taking more than 1 second to execute
+  - name: HighWALSize
+    query: pg_wal_directory_size_bytes{}
+    unit: bytes
+    type: custom
+    description: Size of Write-Ahead Log (WAL) files
+  - name: ReplicationLag
+    query: max by (application_name) (pg_stat_replication_lag_bytes{})
+    unit: bytes
+    type: custom
+    description: How far behind replicas are from the primary node in bytes
+  - name: CacheHitRatio
+    query: sum by (datname) (pg_stat_database_blks_hit{}) / (sum by (datname) (pg_stat_database_blks_hit{}) + sum by (datname) (pg_stat_database_blks_read{})) * 100
+    unit: percent
+    type: custom
+    description: Buffer cache hit ratio - percentage of blocks found in PostgreSQL buffer cache
+  ###### alert rules
+  alert_rules:
+  - name: Critical Connection Utilization
+    description: "PostgreSQL approaching connection limit"
+    indicator: HighConnectionUtilization
+    greater_than: 85
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: HighConnectionUtilization
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Too Many Long Running Transactions
+    description: "Multiple long-running transactions detected"
+    indicator: LongRunningTransactions
+    greater_than: 5
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: LongRunningTransactions
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Database Size Warning
+    description: "Database size approaching storage limits"
+    indicator: HighDatabaseSize
+    greater_than: 85899345920  # 80GB in bytes
+    bad_minutes: 60
+    total_minutes: 60
+    severity: warning
+    expression: HighDatabaseSize
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Deadlock Alert
+    description: "Unusual number of deadlocks detected"
+    indicator: DeadlockRate
+    greater_than: 1
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: DeadlockRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Number of Slow Queries
+    description: "Multiple slow queries detected"
+    indicator: SlowQueries
+    greater_than: 10
+    bad_minutes: 10
+    total_minutes: 15
+    severity: threat
+    expression: SlowQueries
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: WAL Size Critical
+    description: "Write-Ahead Log consuming excessive disk space"
+    indicator: HighWALSize
+    greater_than: 10737418240  # 10GB in bytes
+    bad_minutes: 15
+    total_minutes: 20
+    severity: threat
+    expression: HighWALSize
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Replication Lag
+    description: "Replication falling significantly behind primary"
+    indicator: ReplicationLag
+    greater_than: 52428800  # 50MB in bytes
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: ReplicationLag
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Low Cache Hit Ratio
+    description: "Buffer cache performance degraded"
+    indicator: CacheHitRatio
+    less_than: 90
+    bad_minutes: 15
+    total_minutes: 20
+    severity: warning
+    expression: CacheHitRatio
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

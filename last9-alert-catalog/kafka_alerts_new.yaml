@@ -1,0 +1,185 @@
+entities:
+- name: Infra Monitoring - Apache Kafka
+  external_ref: kafka-monitoring
+  type: infra-alerts
+  entity_class: alert-manager
+  description: "Kafka Alerts: Brokers, Consumer Groups, Topics, Partitions, Lag"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - Kafka
+  - Messaging
+  links: []
+  ###### indicators
+  indicators:
+  - name: UnderReplicatedPartitions
+    query: sum(kafka_server_replicamanager_underreplicatedpartitions)
+    unit: count
+    type: custom
+    description: Number of partitions that don't have enough replicas
+  - name: OfflinePartitionsCount
+    query: sum(kafka_controller_kafkacontroller_offlinepartitionscount)
+    unit: count
+    type: custom
+    description: Number of partitions that are offline (unavailable)
+  - name: ActiveControllers
+    query: sum(kafka_controller_kafkacontroller_activecontrollercount)
+    unit: count
+    type: custom
+    description: Number of active controllers in the Kafka cluster (should be exactly 1)
+  - name: ConsumerCommitLatencyMax
+    query: max by (client_id, consumer_group) (kafka_consumer_commit_latency_max)
+    unit: seconds
+    type: custom
+    description: Maximum latency of commit requests sent to the broker
+  - name: ConsumerCommitLatencyAvg
+    query: avg by (client_id, consumer_group) (kafka_consumer_commit_latency_avg)
+    unit: seconds
+    type: custom
+    description: Average latency of commit requests sent to the broker
+  - name: ConsumerCommitRate
+    query: sum by (client_id, consumer_group) (rate(kafka_consumer_commit_rate[5m]))
+    unit: count
+    type: custom
+    description: Rate of commit requests per consumer
+  - name: ConsumerBytesConsumedRate
+    query: sum by (client_id, consumer_group) (rate(kafka_consumer_bytes_consumed_rate[5m]))
+    unit: bytes
+    type: custom
+    description: Rate of bytes consumed by consumer group
+  - name: ConsumerConnectionCount
+    query: sum by (client_id, consumer_group) (kafka_consumer_connection_count)
+    unit: count
+    type: custom
+    description: Number of active connections per consumer
+  - name: ConsumerFailedAuthenticationRate
+    query: sum by (client_id, consumer_group) (rate(kafka_consumer_failed_authentication_rate[5m]))
+    unit: count
+    type: custom
+    description: Rate of failed authentication attempts by consumers
+  - name: ConsumerFailedReauthenticationRate
+    query: sum by (client_id, consumer_group) (rate(kafka_consumer_failed_reauthentication_rate[5m]))
+    unit: count
+    type: custom
+    description: Rate of failed reauthentication attempts by consumers
+  - name: ConsumerAssignedPartitions
+    query: sum by (client_id, consumer_group) (kafka_consumer_assigned_partitions)
+    unit: count
+    type: custom
+    description: Number of partitions assigned to a consumer
+  ###### alert rules
+  alert_rules:
+  - name: Kafka Under-Replicated Partitions
+    description: "Kafka cluster has under-replicated partitions"
+    indicator: UnderReplicatedPartitions
+    greater_than: 0
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: UnderReplicatedPartitions
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Kafka Offline Partitions
+    description: "Kafka cluster has offline partitions"
+    indicator: OfflinePartitionsCount
+    greater_than: 0
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: OfflinePartitionsCount
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Kafka Controller Count Error
+    description: "Kafka cluster does not have exactly one active controller"
+    indicator: ActiveControllers
+    not_equal_to: 1
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: ActiveControllers
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Consumer Commit Latency
+    description: "Kafka consumer experiencing high commit latency"
+    indicator: ConsumerCommitLatencyMax
+    greater_than: 2
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: ConsumerCommitLatencyMax
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Elevated Average Consumer Commit Latency
+    description: "Kafka consumer average commit latency rising"
+    indicator: ConsumerCommitLatencyAvg
+    greater_than: 1
+    bad_minutes: 5
+    total_minutes: 10
+    severity: warning
+    expression: ConsumerCommitLatencyAvg
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Low Consumer Commit Rate
+    description: "Kafka consumer commit rate dropping below threshold"
+    indicator: ConsumerCommitRate
+    less_than: 1
+    bad_minutes: 5
+    total_minutes: 10
+    severity: warning
+    expression: ConsumerCommitRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Low Consumer Throughput
+    description: "Kafka consumer throughput dropping below expected level"
+    indicator: ConsumerBytesConsumedRate
+    less_than: 1024
+    bad_minutes: 10
+    total_minutes: 15
+    severity: warning
+    expression: ConsumerBytesConsumedRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Consumer Connection Issues
+    description: "Kafka consumer connection count at zero"
+    indicator: ConsumerConnectionCount
+    equal_to: 0
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: ConsumerConnectionCount
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Consumer Authentication Failures
+    description: "Kafka consumer experiencing authentication failures"
+    indicator: ConsumerFailedAuthenticationRate
+    greater_than: 0
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: ConsumerFailedAuthenticationRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Consumer Reauthentication Failures
+    description: "Kafka consumer experiencing reauthentication failures"
+    indicator: ConsumerFailedReauthenticationRate
+    greater_than: 0
+    bad_minutes: 5
+    total_minutes: 10
+    severity: breach
+    expression: ConsumerFailedReauthenticationRate
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Consumer Partition Assignment Change
+    description: "Significant change in consumer partition assignments"
+    indicator: ConsumerAssignedPartitions
+    equal_to: 0
+    bad_minutes: 5
+    total_minutes: 10
+    severity: threat
+    expression: ConsumerAssignedPartitions
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

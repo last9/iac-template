@@ -1,0 +1,191 @@
+entities:
+  - name: JVM Monitoring
+    external_ref: jvm-monitoring
+    type: service_alert_manager
+    entity_class: alert-manager
+    description: "JVM Alerts: Memory, GC, CPU Utilization, Threads"
+    data_source: prod-cluster
+    ui_readonly: false
+    tags:
+      - Last9
+      - IaC
+      - JVM
+      - Java
+    links: []
+    ###### indicators
+    indicators:
+      - name: HighMemoryUtilization
+        query: sum by (instance) (jvm_memory_used_bytes / jvm_memory_limit_bytes * 100)
+        unit: percent
+        type: custom
+        description: Percentage of JVM heap memory currently in use
+      - name: MemoryAfterGC
+        query: sum by (instance) (jvm_memory_used_after_last_gc_bytes / jvm_memory_limit_bytes * 100)
+        unit: percent
+        type: custom
+        description: Percentage of memory still in use after the last garbage collection
+      - name: GCDuration
+        query: sum by (instance) (rate(jvm_gc_duration_seconds_sum[5m]) / rate(jvm_gc_duration_seconds_count[5m]))
+        unit: seconds
+        type: custom
+        description: Average duration of garbage collection pauses
+      - name: CPUUtilization
+        query: max by (instance) (jvm_cpu_recent_utilization_ratio * 100)
+        unit: percent
+        type: custom
+        description: Recent CPU utilization of the JVM
+      - name: ThreadCount
+        query: max by (instance) (jvm_thread_count)
+        unit: count
+        type: custom
+        description: Current number of threads in the JVM
+      - name: ClassLoadingRate
+        query: sum by (instance) (rate(jvm_class_loaded_total[5m]))
+        unit: count
+        type: custom
+        description: Rate of class loading operations
+      - name: ClassUnloadingRate
+        query: sum by (instance) (rate(jvm_class_unloaded_total[5m]))
+        unit: count
+        type: custom
+        description: Rate of class unloading operations
+      - name: TotalClassCount
+        query: max by (instance) (jvm_class_count)
+        unit: count
+        type: custom
+        description: Total number of loaded classes in the JVM
+      - name: GCFrequency
+        query: sum by (instance) (rate(jvm_gc_duration_seconds_count[5m]))
+        unit: count
+        type: custom
+        description: Frequency of garbage collection events
+    ###### alert rules
+    alert_rules:
+      - name: JVM High Memory Utilization
+        description: "JVM memory usage approaching heap limit"
+        indicator: HighMemoryUtilization
+        greater_than: 85
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+        expression: HighMemoryUtilization
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Memory usage exceeding 85% of heap limit
+          runbook: https://notion.com/runbooks/java-platform/memory_troubleshooting
+      - name: JVM Memory Leak Suspected
+        description: "Memory usage after GC remains high, indicating potential memory leak"
+        indicator: MemoryAfterGC
+        greater_than: 75
+        bad_minutes: 10
+        total_minutes: 15
+        severity: breach
+        expression: MemoryAfterGC
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Memory remains high after garbage collection
+          runbook: https://notion.com/runbooks/java-platform/memory_leak_investigation
+      - name: JVM Long GC Pauses
+        description: "Garbage collection pauses exceeding acceptable threshold"
+        indicator: GCDuration
+        greater_than: 0.5
+        bad_minutes: 5
+        total_minutes: 10
+        severity: threat
+        expression: GCDuration
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: GC pauses causing application latency
+          runbook: https://notion.com/runbooks/java-platform/gc_tuning
+      - name: JVM High CPU Utilization
+        description: "JVM consuming excessive CPU resources"
+        indicator: CPUUtilization
+        greater_than: 90
+        bad_minutes: 5
+        total_minutes: 10
+        severity: breach
+        expression: CPUUtilization
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: CPU usage exceeding 90%
+          runbook: https://notion.com/runbooks/java-platform/cpu_troubleshooting
+      - name: JVM Abnormal Thread Count
+        description: "Unusually high number of threads detected in JVM"
+        indicator: ThreadCount
+        greater_than: 200
+        bad_minutes: 5
+        total_minutes: 10
+        severity: threat
+        expression: ThreadCount
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Thread count exceeding normal threshold
+          runbook: https://notion.com/runbooks/java-platform/thread_management
+      - name: JVM High Class Loading Rate
+        description: "Excessive class loading activity detected"
+        indicator: ClassLoadingRate
+        greater_than: 100
+        bad_minutes: 5
+        total_minutes: 10
+        severity: warning
+        expression: ClassLoadingRate
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Class loading rate is unusually high
+          runbook: https://notion.com/runbooks/java-platform/classloading_issues
+      - name: JVM High Class Unloading Rate
+        description: "Unusual class unloading activity detected"
+        indicator: ClassUnloadingRate
+        greater_than: 50
+        bad_minutes: 5
+        total_minutes: 10
+        severity: warning
+        expression: ClassUnloadingRate
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Class unloading rate is unusually high
+          runbook: https://notion.com/runbooks/java-platform/classloading_issues
+      - name: JVM Class Count Growth
+        description: "JVM loaded class count growing abnormally"
+        indicator: TotalClassCount
+        greater_than: 10000
+        bad_minutes: 15
+        total_minutes: 20
+        severity: warning
+        expression: TotalClassCount
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Total class count exceeding normal threshold
+          runbook: https://notion.com/runbooks/java-platform/classloading_issues
+      - name: JVM Frequent Garbage Collections
+        description: "GC running too frequently, indicating memory pressure"
+        indicator: GCFrequency
+        greater_than: 5
+        bad_minutes: 5
+        total_minutes: 10
+        severity: threat
+        expression: GCFrequency
+        is_disabled: false
+        group_timeseries_notifications: true
+        annotations:
+          team: java-platform
+          description: Garbage collection frequency indicates memory pressure
+          runbook: https://notion.com/runbooks/java-platform/gc_tuning
+    ###### notification channels
+    notification_channels: []

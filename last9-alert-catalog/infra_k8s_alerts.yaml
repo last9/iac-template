@@ -1,0 +1,79 @@
+entities:
+- name: Infra Monitoring - Kubernetes
+  external_ref: infra-monitoring
+  type: infra-alerts
+  entity_class: alert-manager
+  description: "Infra Alerts: CPU, Memory, Disk, etc"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - Last9
+  - IaC
+  - k8s
+  links: []
+  ###### indicators
+  indicators:
+  - name: HighDiskPressure
+    query: sum by (node) (kube_node_status_condition{condition="DiskPressure", status="true"} )
+    unit: count
+    type: custom
+    description: High disk pressure on Kubernetes nodes
+  - name: K8s Workload Completion Stability
+    query: "sum by (namespace) ((kube_pod_status_phase{phase=\"Succeeded\"} or kube_pod_status_phase{phase=\"Failed\"}) unless (increase(kube_pod_deletion_timestamp)))"
+    unit: count
+    type: custom
+    description: Counts completed pods (succeeded or failed) not marked for deletion, grouped by namespace
+  - name: Pod Crash Loop Incidence
+    query: sum by (pod, namespace) (kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"})
+    unit: count
+    type: custom
+    description: This SLI represents the incidence of crash loops within pods in a Kubernetes environment.
+  - name: PodReadiness
+    query: sum by (pod, namespace) (kube_pod_status_ready{condition="false"})
+    unit: count
+    type: custom
+    description: This measures the readiness status of pods by namespace. It quantifies the number of pods that are currently in a non-ready state, indicating potential issues with deployment.
+  ###### alert rules
+  alert_rules:
+  - name: High Number Of Non Ready Pods
+    description: "High number of non-ready pods"
+    indicator: PodReadiness
+    greater_than: 0
+    bad_minutes: 8
+    total_minutes: 10
+    severity: breach
+    expression: PodReadiness
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Pod Crash Loop Incidence
+    description: "High pod crash loop incidence"
+    indicator: Pod Crash Loop Incidence
+    greater_than: 0
+    bad_minutes: 8
+    total_minutes: 10
+    severity: breach
+    expression: Pod Crash Loop Incidence
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High Count Of Non Terminating Completed Pods
+    description: "High count of non-terminating completed pods"
+    indicator: K8s Workload Completion Stability
+    greater_than: 0
+    bad_minutes: 4
+    total_minutes: 5
+    severity: threat
+    expression: K8s Workload Completion Stability
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: High disk pressure on Kubernetes nodes
+    description: "High disk pressure on Kubernetes nodes"
+    indicator: HighDiskPressure
+    greater_than: 0
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: HighDiskPressure
+    is_disabled: false
+    group_timeseries_notifications: true
+  ###### notification channels
+  notification_channels: []

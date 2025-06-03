@@ -1,0 +1,185 @@
+entities:
+- name: GCP VM Alerts
+  external_ref: gcp-vm-alerts
+  type: infra-alerts
+  entity_class: alert-manager
+  description: "GCP VM Alerts"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  - name: disk-space-test
+    query: (node_filesystem_avail_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"} * 100) / node_filesystem_size_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Disk_Space_Critical'
+    query: (node_filesystem_avail_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"} * 100) / node_filesystem_size_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"}    
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Disk_Space_Warning'
+    query: (node_filesystem_avail_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"} * 100) / node_filesystem_size_bytes{mountpoint=~"/|/home|/home/containerd|/home/kubernetes/bin"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: InstanceDown'
+    query: up{job=~"node", AutoScalingGroup!~"true", state!~"stopped", Platform!~"windows", application!~"EMR|Python|akamai|test"}
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Instance_Status_Check_Failed'
+    query: aws_ec2_status_check_failed_sum
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Cluster_CPU_Critical'
+    query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance, pod, cluster) * 100)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Cluster_Memory_Critical'
+    query: avg by (instance, pod, cluster) ((node_memory_MemAvailable_bytes{job="node-exporter"}
+      / on(instance) group_left node_memory_MemTotal_bytes{job="node-exporter"}) *
+      100)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_CPU_Critical'
+    query: 100 - (avg by(instance, pod, cluster) (rate(node_cpu_seconds_total{mode="idle"}[5m]))
+      * 100) 
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_CPU_Warning'
+    query: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance,
+      pod, cluster) * 100)
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Memory_Critical'
+    query: (node_memory_MemAvailable_bytes{job=~"node"} / node_memory_MemTotal_bytes{job=~"node"}) * 100
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Memory_Critical_on_kafka'
+    query: (node_memory_MemAvailable_bytes{eksclustername=~"", job=~"node", instance="prod-kafka-1a-1|prod-kafka-1a-2|prod-kafka-1b-1|prod-kafka-1b-2|prod-kafka-1c-1|prod-kafka-1c-2"}
+      / node_memory_MemTotal_bytes{eksclustername=~"", job=~"node", instance="prod-kafka-1a-1|prod-kafka-1a-2|prod-kafka-1b-1|prod-kafka-1b-2|prod-kafka-1c-1|prod-kafka-1c-2"})
+      * 100
+    unit: count
+    type: custom
+    description: ""
+  - name: 'EXPR: Node_Memory_Warning'
+    query: (node_memory_MemAvailable_bytes{job=~"node"} / node_memory_MemTotal_bytes{job=~"node"}) * 100
+    unit: count
+    type: custom
+    description: ""
+  - name: instance down new
+    query: "# This tracks instances that disappear\n(count(compute_googleapis_com_instance_uptime_total{cloud_account_id=\"prj-prod-svc-99\"}
+      offset 5m) by (instance_name) >= 1) \nunless \n(count(compute_googleapis_com_instance_uptime_total{cloud_account_id=\"prj-prod-svc-99\"})
+      by (instance_name) >= 1)"
+    unit: count
+    type: custom
+    description: ""
+  - name: instance-down-test
+    query: max by (instance_name) (compute_googleapis_com_instance_uptime_total{cloud_account_id="prj-prod-svc-99"}) / 3600
+    unit: count
+    type: custom
+    description: ""
+  ###### alert rules
+  alert_rules:
+  - name: instance down new
+    description: '"GCP instance stopped: {{ $labels.instance_name }}"'
+    indicator: instance down new
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 2
+    severity: breach
+    expression: instance down new
+    is_disabled: true
+    group_timeseries_notifications: true
+  - name: Disk_Space_Critical
+    description: ""
+    indicator: 'EXPR: Disk_Space_Critical'
+    less_than: 15
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: Disk_Space_Critical'
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Node_Cluster_CPU_Critical
+    description: ""
+    indicator: 'EXPR: Node_Cluster_CPU_Critical'
+    greater_than: 90
+    bad_minutes: 5
+    total_minutes: 5
+    severity: threat
+    expression: 'EXPR: Node_Cluster_CPU_Critical'
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Node_Cluster_Memory_Critical
+    description: ""
+    indicator: 'EXPR: Node_Cluster_Memory_Critical'
+    less_than: 10
+    bad_minutes: 5
+    total_minutes: 5
+    severity: threat
+    expression: 'EXPR: Node_Cluster_Memory_Critical'
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: instance-down-test
+    description: Instance down alert detected on {{ $labels.instance_name }}
+    indicator: instance-down-test
+    equal_to: 1
+    bad_minutes: 3
+    total_minutes: 5
+    severity: breach
+    expression: instance-down-test
+    is_disabled: true
+    group_timeseries_notifications: true
+  - name: Node_CPU_Critical
+    description: ""
+    indicator: 'EXPR: Node_CPU_Critical'
+    greater_than: 0
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: 'EXPR: Node_CPU_Critical'
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Disk_Space_Warning
+    description: ""
+    indicator: 'EXPR: Disk_Space_Warning'
+    less_than: 30
+    bad_minutes: 5
+    total_minutes: 5
+    severity: threat
+    expression: 'EXPR: Disk_Space_Warning'
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Disk-space-test
+    description: ""
+    indicator: disk-space-test
+    less_than: 40
+    bad_minutes: 5
+    total_minutes: 5
+    severity: breach
+    expression: disk-space-test
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Node_CPU_Warning
+    description: ""
+    indicator: 'EXPR: Node_CPU_Warning'
+    greater_than: 80
+    bad_minutes: 5
+    total_minutes: 5
+    severity: threat
+    expression: 'EXPR: Node_CPU_Warning'
+    is_disabled: false
+    group_timeseries_notifications: true
+  notification_channels: []

@@ -1,0 +1,20 @@
+entities:
+- name: Database Monitoring
+  external_ref: database-monitoring
+  type: database-alerts
+  entity_class: alert-manager
+  description: "Database Alerts"
+  data_source: default
+  ui_readonly: false
+  tags:
+  - IaC
+  - Last9
+  links: []
+  ###### indicators
+  indicators:
+  
+  ###### alert rules
+  alert_rules:
+  
+  ###### notification channels
+  notification_channels: []
