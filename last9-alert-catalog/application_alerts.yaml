@@ -10,48 +10,54 @@ entities:
   - IaC
   - Last9
   links: []
-  ###### indicators
   indicators:
   - name: 4xx Status
-    query: sum by (service_name) (rate(calls_total{span_kind="SPAN_KIND_SERVER", http_status_code=~"^4.*"}[4m])) * 60
+    query: sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
+      http_status_code=~"^4.*"}[4m])) * 60
     unit: rpm
     type: custom
     description: "Measures the rate of client error responses (400-499) per minute across different services, indicating client-side issues like bad requests or authentication failures."
   - name: 5xx Status
-    query: sum by (service_name) (rate(calls_total{span_kind="SPAN_KIND_SERVER", http_status_code=~"^5.*"}[4m])) * 60
+    query: sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
+      http_status_code=~"^5.*"}[4m])) * 60
     unit: rpm
     type: custom
     description: "Tracks the rate of server error responses (500-599) per minute by service, showing where internal server errors are occurring."
-  - name: Throughput
-    query: (sum by (service_name) (rate(calls_total{span_kind="SPAN_KIND_SERVER", http_status_code!=""}[4m])))*60
-    unit: rpm
-    type: custom
-    description: "Monitors the total number of incoming requests per minute for each service, providing visibility into overall traffic patterns."
-  - name: Incoming Requests Latency p50
-    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER', http_method!=''}[4m])) by (le, service_name))
-    unit: ms
-    type: custom
-    description: "Shows the median (50th percentile) response time in milliseconds for incoming server requests, indicating typical user experience."
-  - name: External Requests Latency p50
-    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_CLIENT', http_method!=''}[4m])) by (le, service_name))
-    unit: ms
-    type: custom
-    description: "Measures the median (50th percentile) response time in milliseconds for outgoing client requests to external services."
   - name: Endpoint Latency p75
-    query: histogram_quantile(0.75, sum(rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER', http_status_code!=''}[4m])) by (le,span_name))
+    query: histogram_quantile(0.75, sum(rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER',
+      http_status_code!=''}[4m])) by (le,span_name))
     unit: ms
     type: custom
     description: "Captures the 75th percentile response time in milliseconds for specific API endpoints, highlighting slower-than-typical requests."
-  ###### alert rules
+  - name: External Requests Latency p50
+    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_CLIENT',
+      http_method!=''}[4m])) by (le, service_name))
+    unit: ms
+    type: custom
+    description: "Measures the median (50th percentile) response time in milliseconds for outgoing client requests to external services."
+  - name: Incoming Requests Latency p50
+    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER',
+      http_method!=''}[4m])) by (le, service_name))
+    unit: ms
+    type: custom
+    description: "Shows the median (50th percentile) response time in milliseconds for incoming server requests, indicating typical user experience."
+  - name: Throughput
+    query: (sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
+      http_status_code!=""}[4m])))*60
+    unit: rpm
+    type: custom
+    description: "Monitors the total number of incoming requests per minute for each service, providing visibility into overall traffic patterns."
   alert_rules:
-  - name: 4xx Alerts Threat
-    description: "Threat:High 4xx detected on {{ $labels.service_name }} "
-    indicator: 4xx Status
-    greater_than: 0
+  - name: Throughput
+    description: 'High Throughput detected on {{ $labels.service_name }} throughput
+      deviation detected - monitoring requests per minute exceeding expected threshold,
+      indicating potential performance degradation or traffic spike. '
+    indicator: Throughput
+    greater_than: 15000
     bad_minutes: 1
     total_minutes: 1
     severity: threat
-    expression: increasing_trend(4, 4xx Status)
+    expression: Throughput
     is_disabled: false
     group_timeseries_notifications: true
     annotations:
@@ -63,8 +69,54 @@ entities:
         $labels.service_name }}%22%7D%5D&page=1
     runbook:
       link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
+  - name: Endpoint Latency p75
+    description: ""
+    indicator: Endpoint Latency p75
+    greater_than: 500
+    bad_minutes: 2
+    total_minutes: 5
+    severity: breach
+    expression: Endpoint Latency p75
+    is_disabled: false
+    group_timeseries_notifications: true
+  - name: Incoming Requests Latency p50
+    description: ' High Incoming Requests P50 Latency detected on {{ $labels.service_name
+      }}'
+    indicator: Incoming Requests Latency p50
+    greater_than: 1000
+    bad_minutes: 1
+    total_minutes: 5
+    severity: threat
+    expression: Incoming Requests Latency p50
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
+        $labels.service_name }}
+      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
+        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
+        $labels.service_name }}%22%7D%5D&page=1
+  - name: External Requests Latency p50
+    description: High External Requests P50 Latency detected on {{ $labels.service_name
+      }}
+    indicator: External Requests Latency p50
+    greater_than: 1000
+    bad_minutes: 1
+    total_minutes: 5
+    severity: threat
+    expression: External Requests Latency p50
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
+        $labels.service_name }}
+      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
+        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
+        $labels.service_name }}%22%7D%5D&page=1
   - name: 4xx Alerts Breach
-    description: "Breach: High 4xx detected on {{ $labels.service_name }} "
+    description: 'Breach: High 4xx detected on {{ $labels.service_name }} '
     indicator: 4xx Status
     greater_than: 0
     bad_minutes: 1
@@ -82,8 +134,46 @@ entities:
         $labels.service_name }}%22%7D%5D&page=1
     runbook:
       link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
+  - name: 5xx Alerts Breach
+    description: 'Breach: High 5xx detected on {{ $labels.service_name }}'
+    indicator: 5xx Status
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 1
+    severity: breach
+    expression: high_spike(9, 5xx Status)
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
+        $labels.service_name }}
+      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
+        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Check Traces: https://app.last9.io/v2/organizations/<orgslug>utio/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
+        $labels.service_name }}%22%7D%5D&page=1
+    runbook:
+      link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
+  - name: 4xx Alerts Threat
+    description: 'Threat:High 4xx detected on {{ $labels.service_name }} '
+    indicator: 4xx Status
+    greater_than: 0
+    bad_minutes: 1
+    total_minutes: 1
+    severity: threat
+    expression: increasing_trend(4, 4xx Status)
+    is_disabled: false
+    group_timeseries_notifications: true
+    annotations:
+      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
+        $labels.service_name }}
+      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
+        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
+      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
+        $labels.service_name }}%22%7D%5D&page=1
+    runbook:
+      link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
   - name: 5xx Alerts Threat
-    description: "Threat:High 5xx detected on {{ $labels.service_name }}"
+    description: Threat:High 5xx detected on {{ $labels.service_name }}
     indicator: 5xx Status
     greater_than: 0
     bad_minutes: 1
@@ -101,79 +191,4 @@ entities:
         $labels.service_name }}%22%7D%5D&page=1
     runbook:
       link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
-  - name: 5xx Alerts Breach
-    description: "Breach: High 5xx detected on {{ $labels.service_name }}"
-    indicator: 5xx Status
-    greater_than: 0
-    bad_minutes: 1
-    total_minutes: 1
-    severity: breach
-    expression: high_spike(9, 5xx Status)
-    is_disabled: false
-    group_timeseries_notifications: true
-    annotations:
-      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
-        $labels.service_name }}
-      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
-        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
-      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
-        $labels.service_name }}%22%7D%5D&page=1
-    runbook:
-      link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
-  - name: Throughput Alerts
-    description: "High Throughput detected on {{ $labels.service_name }} throughput
-      deviation detected - monitoring requests per minute exceeding expected threshold,
-      indicating potential performance degradation or traffic spike. "
-    indicator: Throughput
-    greater_than: 12
-    bad_minutes: 1
-    total_minutes: 1
-    severity: threat
-    expression: Throughput
-    is_disabled: false
-    group_timeseries_notifications: true
-    annotations:
-      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
-        $labels.service_name }}
-      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
-        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
-      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
-        $labels.service_name }}%22%7D%5D&page=1
-    runbook:
-      link: https://www.notion.so/last9/Runbook-Throughput-1eced632a5d4805888aad376c3badebb
-  - name: External Requests Latency Alerts
-    description: "High External Requests P50 Latency detected on {{ $labels.service_name }}"
-    indicator: External Requests Latency p50
-    greater_than: 1000
-    bad_minutes: 1
-    total_minutes: 5
-    severity: threat
-    expression: External Requests Latency p50
-    is_disabled: false
-    group_timeseries_notifications: true
-    annotations:
-      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
-        $labels.service_name }}
-      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
-        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
-      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
-        $labels.service_name }}%22%7D%5D&page=1
-  - name: Incoming Requests Latency Alerts
-    description: " High Incoming Requests P50 Latency detected on {{ $labels.service_name }}"
-    indicator: Incoming Requests Latency p50
-    greater_than: 1000
-    bad_minutes: 1
-    total_minutes: 5
-    severity: threat
-    expression: Incoming Requests Latency p50 
-    is_disabled: false
-    group_timeseries_notifications: true
-    annotations:
-      Check APM: https://app.last9.io/v2/organizations/<orgslug>/dashboards/6ed36b2a-d7ec-46aa-bb38-166beccec02f?cluster=12e34d24-c2f6-45a4-8833-ed6650144333&latency=0.5&service={{
-        $labels.service_name }}
-      Check Logs: https://app.last9.io/v2/organizations/<orgslug>/logs?pipeline=%5B%7B%22query%22%3A%7B%22%24and%22%3A%5B%7B%22%24eq%22%3A%5B%22ServiceName%22%2C%22{{
-        $labels.service_name }}%22%5D%7D%5D%7D%2C%22type%22%3A%22filter%22%7D%5D
-      Check Traces: https://app.last9.io/v2/organizations/<orgslug>/traces?filters=%5B%7B%22name%22%3A%22service.name%22%2C%22operator%22%3A%22%3D%22%2C%22type%22%3A%22resource%22%2C%22value%22%3A%22{{
-        $labels.service_name }}%22%7D%5D&page=1
-    
   notification_channels: []
