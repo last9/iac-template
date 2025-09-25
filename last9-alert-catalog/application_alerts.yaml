@@ -22,17 +22,17 @@ entities:
     type: custom
     description: "Tracks the rate of server error responses (500-599) per minute by service, showing where internal server errors are occurring."
   - name: Endpoint Latency p75
-    query: quantile_over_time(0.75, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_status_code!="",quantile="p75"}) by (span_name))
+    query: quantile_over_time(0.95, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_status_code!="",quantile="p75"}) by (span_name))
     unit: ms
     type: custom
     description: "Captures the 75th percentile response time in milliseconds for specific API endpoints, highlighting slower-than-typical requests."
   - name: External Requests Latency p50
-    query: quantile_over_time(0.5, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_method!="",quantile="p50"}) by (service_name))
+    query: quantile_over_time(0.95, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_method!="",quantile="p50"}) by (service_name))
     unit: ms
     type: custom
     description: "Measures the median (50th percentile) response time in milliseconds for outgoing client requests to external services."
   - name: Incoming Requests Latency p50
-    query: query: quantile_over_time(0.5, sum(trace_client_duration{span_kind="SPAN_KIND_CLIENT",http_method!="",quantile="p50"}) by (service_name))
+    query: query: quantile_over_time(0.95, sum(trace_client_duration{span_kind="SPAN_KIND_CLIENT",http_method!="",quantile="p50"}) by (service_name))
     unit: ms
     type: custom
     description: "Shows the median (50th percentile) response time in milliseconds for incoming server requests, indicating typical user experience."
