@@ -12,38 +12,32 @@ entities:
   links: []
   indicators:
   - name: 4xx Status
-    query: sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
-      http_status_code=~"^4.*"}[4m])) * 60
+    query: sum by (service_name)(sum_over_time(trace_endpoint_count{span_kind="SPAN_KIND_SERVER",http_status_code=~"4.*"}[1m]))
     unit: rpm
     type: custom
     description: "Measures the rate of client error responses (400-499) per minute across different services, indicating client-side issues like bad requests or authentication failures."
   - name: 5xx Status
-    query: sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
-      http_status_code=~"^5.*"}[4m])) * 60
+    query: sum by (service_name)(sum_over_time(trace_endpoint_count{span_kind="SPAN_KIND_SERVER",http_status_code=~"5.*"}[1m]))
     unit: rpm
     type: custom
     description: "Tracks the rate of server error responses (500-599) per minute by service, showing where internal server errors are occurring."
   - name: Endpoint Latency p75
-    query: histogram_quantile(0.75, sum(rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER',
-      http_status_code!=''}[4m])) by (le,span_name))
+    query: quantile_over_time(0.95, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_status_code!="",quantile="p75"}) by (span_name))
     unit: ms
     type: custom
     description: "Captures the 75th percentile response time in milliseconds for specific API endpoints, highlighting slower-than-typical requests."
   - name: External Requests Latency p50
-    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_CLIENT',
-      http_method!=''}[4m])) by (le, service_name))
+    query: quantile_over_time(0.95, sum(trace_endpoint_duration{span_kind="SPAN_KIND_SERVER",http_method!="",quantile="p50"}) by (service_name))
     unit: ms
     type: custom
     description: "Measures the median (50th percentile) response time in milliseconds for outgoing client requests to external services."
   - name: Incoming Requests Latency p50
-    query: histogram_quantile(0.5, sum (rate(duration_milliseconds_bucket{span_kind='SPAN_KIND_SERVER',
-      http_method!=''}[4m])) by (le, service_name))
+    query: query: quantile_over_time(0.95, sum(trace_client_duration{span_kind="SPAN_KIND_CLIENT",http_method!="",quantile="p50"}) by (service_name))
     unit: ms
     type: custom
     description: "Shows the median (50th percentile) response time in milliseconds for incoming server requests, indicating typical user experience."
   - name: Throughput
-    query: (sum by (service_name) (rate(duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER",
-      http_status_code!=""}[4m])))*60
+    query: sum by (service_name)(sum_over_time(trace_endpoint_count{span_kind="SPAN_KIND_SERVER",http_status_code!=""}[1m]))
     unit: rpm
     type: custom
     description: "Monitors the total number of incoming requests per minute for each service, providing visibility into overall traffic patterns."
