@@ -1,0 +1,669 @@
+function low_value(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    return ((abs(smooth_exponential(sig, tolerance/10)-sig)/med > bool 0.03)*med)
+}
+
+function high_value(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    return ((abs(smooth_exponential(sig, tolerance/10)-sig)/med > bool 0.02)*med)
+}
+
+function changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    return (((-des > bool med*(per/10)) + (des > bool med*per))*abs(des))
+}
+
+function low_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    return ((-des > bool med*(per/10)) *abs(des))
+}
+
+function high_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    return ((des > bool med*(per/10))*abs(des))
+}
+
+function trend(tolerance,metric){
+    let q   = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + (tolerance/10)*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let lower = quant_l - (tolerance/10)*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    return (((upper < bool sm2) + (lower > bool sm2))*abs(sm2))
+}
+
+function low_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    return ((abs(smooth_exponential(sig, tolerance/10)-sig)/med > bool 0.03)*med)
+}
+
+function high_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    return ((abs(smooth_exponential(sig, tolerance/10)-sig)/med > bool 0.02)*med)
+}
+
+function decreasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    return ((-des > bool med*(per/10)) *abs(des))
+}
+
+function increasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    return ((des > bool med*(per/10))*abs(des))
+}
+
+function increasing_trend(tolerance,metric){
+    let q   = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + (tolerance/10)*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    return ((upper < bool sm2)*abs(sm2-upper))
+}
+
+function decreasing_trend(tolerance,metric){
+    let q   = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - (tolerance/10)*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    return ((lower > bool sm2)*abs(sm2-lower))
+}
+
+function explain_high_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    let lower_sig  = (q if (q<med)) default med
+    let lower = smooth_exponential(lower_sig, tolerance/10) - abs(smooth_exponential(lower_sig, tolerance/10)-lower_sig)
+    let anomaly = (abs((smoothed_signal-sig)/med) > bool 0.02)*med
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower"))
+}
+
+function explain_low_spike(tolerance,metric){
+    let q = metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    let upper_sig  = (q if (q>med)) default med
+    let upper = smooth_exponential(upper_sig, tolerance/10) + abs(smooth_exponential(upper_sig, tolerance/10)-upper_sig)
+    let anomaly = (abs((smoothed_signal-sig)/med) > bool 0.03)*med
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower"))
+}
+
+function explain_increasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d +histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + tolerance/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - tolerance/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let anomaly = ((upper < bool sm2))*abs(sm2-upper)
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower"))
+}
+
+function explain_decreasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - (tolerance/10)*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + (tolerance/10)*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let anomaly = ((lower > bool sm2))*abs(sm2-lower)
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower")) 
+}
+
+function explain_decreasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let anomaly = ((-des > bool med*(per/10)) *abs(des))
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(med, "baseline"))
+}
+
+function explain_increasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let anomaly  = ((des > bool med*(per/10))*abs(des))
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(med, "baseline"))
+}
+
+function explain_upper_bound_high_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_high_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_low_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_low_spike(tolerance,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, tolerance/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_increasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + tolerance/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_increasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - tolerance/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_decreasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + tolerance/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_decreasing_trend(tolerance,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - tolerance/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_increasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let med = median_over_time(sm[1h])
+    return alias(med, "baseline")
+}
+
+function explain_lower_bound_increasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let med = median_over_time(sm[1h])    
+    return alias(med, "baseline")
+}
+
+function explain_upper_bound_decreasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let med = median_over_time(sm[1h])
+    return alias(med, "baseline")
+}
+
+function explain_lower_bound_decreasing_changepoint(per,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let med = median_over_time(sm[1h])    
+    return alias(med, "baseline")
+}
+
+function increasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q   = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + (sensitivity/10)*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    return (((upper < bool sm2)*abs(sm2-upper)) > bool (degradation_percent/10)*sm2)*abs(sm2-upper)
+}
+
+function decreasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q   = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - (sensitivity/10)*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    return (((lower > bool sm2)*abs(sm2-lower)) > bool (degradation_percent/10)*sm2)*abs(sm2-lower)
+}
+
+function low_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med) 
+    let degradation_percent = degradation_percent if (degradation_percent> 0) default 1.5
+    return ((abs(smooth_exponential(sig, sensitivity/10)-sig)/med > bool degradation_percent/50)*med)
+}
+
+function high_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med) 
+    let degradation_percent = degradation_percent if (degradation_percent> 0) default 1.5
+    return ((abs(smooth_exponential(sig, sensitivity/10)-sig)/med > bool degradation_percent/50)*med)
+}
+
+function decreasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m])
+    return ((-des > bool med*(sensitivity/10)) * ((sm_med offset 5m) > bool sm_med*degradation_percent )) *abs(des)
+}
+
+function increasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m])
+    return (((des > bool med*(sensitivity/10))*sm_med) > bool ((sm_med offset 5m)*degradation_percent))*abs(des)
+}
+
+function explain_high_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    let lower_sig  = (q if (q<med)) default med
+    let lower = smooth_exponential(lower_sig, sensitivity/10) - abs(smooth_exponential(lower_sig, sensitivity/10)-lower_sig)
+    let degradation_percent = degradation_percent if (degradation_percent> 0) default 1.5
+    let anomaly = (abs(smooth_exponential(sig, sensitivity/10)-sig)/med > bool degradation_percent/50)*med
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower"))
+}
+
+function explain_low_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    let upper_sig  = (q if (q>med)) default med
+    let upper = smooth_exponential(upper_sig, sensitivity/10) + abs(smooth_exponential(upper_sig, sensitivity/10)-upper_sig)
+    let degradation_percent = degradation_percent if (degradation_percent> 0) default 1.5
+    let anomaly = ((abs(smooth_exponential(sig, sensitivity/10)-sig)/med > bool degradation_percent/50)*med)
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"), alias(lower, "lower"))
+}
+
+function explain_increasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d +histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + sensitivity/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - sensitivity/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let anomaly = (((upper < bool sm2)*abs(sm2-upper)) > bool (degradation_percent/10)*sm2)*abs(sm2-upper)
+    let new_upper =  upper + (degradation_percent/10)*sm2
+    let new_lower = lower - (degradation_percent/10)*sm2
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(new_upper, "upper"), alias(new_lower, "lower"))
+}
+
+function explain_decreasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - (sensitivity/10)*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + (sensitivity/10)*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let anomaly = (((lower > bool sm2)*abs(sm2-lower)) > bool (degradation_percent/10)*sm2)*abs(sm2-lower)
+    let new_upper =  upper + (degradation_percent/10)*sm2
+    let new_lower  = lower - (degradation_percent/10)*sm2
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(new_upper, "upper"), alias(new_lower, "lower")) 
+}
+
+function explain_decreasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m])
+    let anomaly = ((-des > bool med*(sensitivity/10)) * ((sm_med offset 5m) > bool sm_med*degradation_percent )) *abs(des)
+    let upper = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    let lower = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"),alias(lower, "lower"))
+}
+
+function explain_increasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m])
+    let anomaly  = (((des > bool med*(sensitivity/10))*sm_med) > bool (sm_med offset 5m )*degradation_percent)*abs(des)
+    let upper = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    let lower = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(upper, "upper"),alias(lower, "lower"))
+}
+
+function explain_upper_bound_high_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_high_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_low_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q>med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let upper = smoothed_signal + abs(smoothed_signal-sig)
+    return alias(upper,"upper")
+}
+
+function explain_lower_bound_low_spike_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q=metric
+    let med = median_over_time(q[1h])
+    let sig = ((q if (q<med)) default med)
+    let smoothed_signal = smooth_exponential(sig, sensitivity/10)
+    let lower = smoothed_signal - abs(smoothed_signal-sig)
+    return alias(lower,"lower")
+}
+
+function explain_upper_bound_increasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + sensitivity/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let new_upper =  upper + (degradation_percent/10)*sm2
+    return alias(new_upper,"upper")
+}
+
+function explain_lower_bound_increasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - sensitivity/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let new_lower  = lower - (degradation_percent/10)*sm2
+    return alias(new_lower,"lower")
+}
+
+function explain_upper_bound_decreasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_h = interpolate(histogram_quantile(0.95, hists))
+    let upper = quant_h + sensitivity/10*(max_over_time(quant_h[1d]) - avg_over_time(q[7d]))
+    let new_upper =  upper + (degradation_percent/10)*sm2
+    return alias(new_upper,"upper")
+}
+
+function explain_lower_bound_decreasing_trend_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q = metric
+    let sm2 = avg_over_time(q[15m])
+    let hists = histogram_over_time(q[120m]) offset 1d + histogram_over_time(q[105m]) offset 2d + histogram_over_time(q[90m]) offset 3d +  histogram_over_time(q[90m]) offset 4d + histogram_over_time(q[90m]) offset 5d + histogram_over_time(q[90m]) offset 6d + histogram_over_time(q[90m]) offset 7d
+    let quant_l = interpolate(histogram_quantile(0.05, hists))
+    let lower = quant_l - sensitivity/10*(avg_over_time(q[7d]) - min_over_time(quant_l[1d]))
+    let new_lower  = lower - (degradation_percent/10)*sm2
+    return alias(new_lower,"lower")
+}
+
+function explain_upper_bound_increasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q  = metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m]) 
+    let bound = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return alias(bound, "upper")
+}
+
+function explain_lower_bound_increasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])    
+    let sm_med = median_over_time(sm[15m]) 
+    let bound = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return alias(bound, "lower")
+}
+
+function explain_upper_bound_decreasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])
+    let sm_med = median_over_time(sm[15m]) 
+    let bound = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return alias(bound, "upper")
+}
+
+function explain_lower_bound_decreasing_changepoint_with_degradation_percentage(sensitivity,degradation_percent,metric){
+    let q =metric
+    let sm = smooth_exponential(q, 0.1)
+    let des = delta(sm[1h])
+    let med = median_over_time(sm[1h])    
+    let sm_med = median_over_time(sm[15m]) 
+    let bound = (abs(des)*(sensitivity/10)) + (sm_med offset 5m -sm_med)* degradation_percent
+    return alias(bound, "lower")
+}
+
+function l9_los(wait_duration,metric){
+    let q = metric
+    return alias((duration_over_time(q[wait_duration], 24h)-(duration_over_time(q[24h], 24h) offset 1h)/wait_duration < bool 0),'los')
+}
+
+function level_increase(n,d,ds,t,absolute_percent,degradation_percent){
+    let q = ((n/d) * 100) or on () vector(0)
+    let per = ( ((n/(d*t))*100)  if (d < ds) default q )
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = ((sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    return (per > bool absolute_percent)* (result)
+}
+
+function explain_level_increase(n,d,ds,t,absolute_percent,degradation_percent){
+    let q = ((n/d) * 100) or on () vector(0)
+    let per = ( ((n/(d*t))*100)  if (d < ds) default q )
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = ((sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    let anomaly = (per > bool absolute_percent)* (result) 
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(sm_med, "baseline"))
+}
+
+function level_decrease (n,d,ds,t,absolute_percent,degradation_percent){
+    let q = ((n/d) * 100) or on () vector(0)
+    let per = ( ((n/(d*t))*100)  if (d < ds) default q )
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = (-(sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    return (per > bool absolute_percent)* (result)
+}
+
+function explain_level_decrease(n,d,ds,t,absolute_percent,degradation_percent){
+    let q = ((n/d) * 100) or on () vector(0)
+    let per = ( ((n/(d*t))*100)  if (d < ds) default q )
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = (-(sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    let anomaly = (per > bool absolute_percent)* (result) 
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(sm_med, "baseline"))
+}
+
+function level_shift_down (absolute_value,degradation_percent,metric){
+    let q = metric 
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = (-(sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    return result * (q > bool absolute_value) 
+}
+
+function level_shift_up(absolute_value,degradation_percent,metric){
+    let q = metric 
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = ((sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    return result * (q > bool absolute_value)
+}
+
+function explain_level_shift_down (absolute_value,degradation_percent,metric){
+    let q = metric 
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = (-(sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med)
+    let anomaly = result * (q > bool absolute_value) 
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(sm_med, "baseline"))
+}
+
+function explain_level_shift_up(absolute_value,degradation_percent,metric){
+    let q = metric 
+    let med = median_over_time(q[1h])
+    let sm_med = median_over_time(q[10m])
+    let result  = ((sm_med - med offset 10m) >  bool (med*degradation_percent) )*(sm_med) 
+    let anomaly  = result * (q > bool absolute_value)
+    return union(alias(q,"metric"),alias(anomaly,"anomaly_output"), alias(sm_med, "baseline"))
+}
+
+function appdex_score_with_threshold(percentile, metric_filter, metric, metric_for_total_users, threshold) {
+   let q = metric
+   let qtu = metric_for_total_users
+   let th =threshold 
+   let satisfied_users = sum( topk ( 1,
+                          sum by (le)(rate(q{metric_filter}[4m])*60)
+                          and
+                          (
+                            label_value(sum by (le)(q{metric_filter}), "le") < (th)
+                           )))
+   let tolerating_high_bound =   sum( topk ( 1,
+                          sum by (le)(rate(q{metric_filter}[4m])*60)
+                          and
+                          (
+                            label_value(sum by (le)(q{metric_filter}), "le") < (4 * th)
+                           )))
+    let tolerating_users = (tolerating_high_bound - satisfied_users) / 2
+    let le_filter = {le="+Inf"}
+    let total_users = sum(rate(q{metric_filter,le_filter }[4m])*60)
+    let num = satisfied_users + tolerating_users
+    let score = num / total_users
+   return (score)
+}
+
+function appdex_score (percentile,metric_filter,metric,metric_for_total_users) {
+   let q = metric
+   let qtu = metric_for_total_users
+   let threshold = histogram_quantile(0.5, sum by (le)(rate(q{metric_filter}[4m])*60))
+   let satisfied_users = sum( topk ( 1,
+                          sum by (le)(rate(q{metric_filter}[4m])*60)
+                          and
+                          (
+                            label_value(sum by (le)(q{metric_filter}), "le") < (threshold)
+                           )))
+   let tolerating_high_bound =   sum( topk ( 1,
+                          sum by (le)(rate(q{metric_filter}[4m])*60)
+                          and
+                          (
+                            label_value(sum by (le)(q{metric_filter}), "le") < (4 * threshold)
+                           )))
+    let tolerating_users = (tolerating_high_bound - satisfied_users) / 2
+    let le_filter = {le="+Inf"}
+    let total_users = sum(rate(q{metric_filter,le_filter }[4m])*60)
+    let num = satisfied_users + tolerating_users
+    let score = num / total_users
+   return (score)
+}
+
+function availability (metric,metric_filter,good_codes,all_codes,window){
+    return  sum(rate(metric{metric_filter,good_codes}[window])) / sum(rate(metric{metric_filter, all_codes}[window]))
+}
+
+function adjusted_err_rate(n, d, dmin, tolerance) {
+    let per = ( ( n / d) * 100)
+    let out = ( ( ( n / ( d * tolerance ) ) * 100)  if (d < dmin) default per )
+    return (out)
+}
+
+function get_threshold_with_event_context(query, event_threshold, normal_threshold,window) {
+ let active_event = lag(query[window])  < bool window*1 
+ let threshold = (vector(event_threshold) and on() (active_event > 0)) or on() vector(normal_threshold)
+ return (threshold)
+}
+
+function apply_threshold_with_event_context(metric, event_query,event_threshold, normal_threshold,window) {
+ let q = metric
+ let active_event = lag(event_query[window])  < bool window*1 
+ let threshold = (vector(event_threshold) and on() (active_event > 0)) or on() vector(normal_threshold)
+ let result =  q > threshold 
+ return (result)
+}
+
+function adaptive_std_cmp(indicator, std_factor, window)  { 
+  return ((indicator > bool (avg_over_time(indicator[window]) + std_factor*stddev_over_time(indicator[window]))) + (indicator < bool (avg_over_time(indicator[window]) -std_factor*stddev_over_time(indicator[window]))))
+}
+
+function explain_adaptive_std_cmp_upper(indicator, std_factor, window)  {
+  return avg_over_time(indicator[window]) + std_factor*stddev_over_time(indicator[window])
+}
+
+function explain_adaptive_std_cmp_lower(indicator, std_factor, window)  {
+  return avg_over_time(indicator[window]) - std_factor*stddev_over_time(indicator[window])
+}
