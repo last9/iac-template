@@ -32,7 +32,7 @@ entities:
     type: custom
     description: "Measures the median (50th percentile) response time in milliseconds for outgoing client requests to external services."
   - name: Incoming Requests Latency p50
-    query: query: quantile_over_time(0.95, sum(trace_client_duration{span_kind="SPAN_KIND_CLIENT",http_method!="",quantile="p50"}) by (service_name))
+    query: quantile_over_time(0.95, sum(trace_client_duration{span_kind="SPAN_KIND_CLIENT",http_method!="",quantile="p50"}) by (service_name))
     unit: ms
     type: custom
     description: "Shows the median (50th percentile) response time in milliseconds for incoming server requests, indicating typical user experience."
