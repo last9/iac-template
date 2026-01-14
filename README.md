@@ -1,33 +1,120 @@
 ### Introduction
 
-This repo is used to manage alerts on Last9.
+This repo contains scripts to manage Last9 alerts using Infrastructure as Code (IaC) principles. Alert YAML files are version-controlled in separate org-specific repositories and deployed via GitOps workflows.
 
-### Enabling alerting for application and infra metrics
+## Repository Structure
+
+```
+workspace/
+├── iac-template/              <- This repo (scripts and tooling)
+│   ├── scripts/
+│   │   ├── setup-iac-env.sh  <- Setup wizard
+│   │   ├── fetch-alerts.py   <- Download alerts from Last9
+│   │   └── run-iac.sh        <- Deploy alerts to Last9
+│   └── .last9.config.json    <- Your configuration (gitignored)
+└── <org>-alerts/              <- Your alerts repo (e.g., demo-alerts/)
+    ├── alert1.yaml
+    ├── alert2.yaml
+    └── ...
+```
+
+## Quick Start
+
+Get up and running in 10 minutes:
+
+### 1. Run the Setup Script
+
+From your `<org>-alerts` directory:
+
+```bash
+cd /path/to/<org>-alerts
+../iac-template/scripts/setup-iac-env.sh
+```
+
+The interactive setup wizard will:
+- ✅ Install dependencies (Python, jq, l9iac CLI)
+- ✅ Collect your Last9 API tokens (get from https://app.last9.io/settings/api-tokens)
+- ✅ Optionally configure AWS S3 for state locking
+- ✅ Optionally configure GitHub Actions secrets
+
+**All steps are optional** - you have full control. AWS S3 is only needed for distributed state locking in CI/CD environments. For local development, local state locking works fine.
+
+### 2. Fetch Existing Alerts
+
+From `iac-template` directory:
+
+```bash
+cd ../iac-template
+python3 scripts/fetch-alerts.py
+```
+
+This will download your existing alerts from Last9 to `../<org>-alerts/` directory.
+
+### 3. Review and Edit Alerts
+
+```bash
+cd ../<org>-alerts
+ls *.yaml
+vi <alert-name>.yaml  # Edit as needed
+```
+
+### 4. Test Locally
+
+From `iac-template` directory:
+
+```bash
+cd ../iac-template
+source env/bin/activate
+./scripts/run-iac.sh --run-all-files --plan
+```
+
+### 5. Deploy Changes
+
+From `<org>-alerts` directory:
+
+```bash
+cd ../<org>-alerts
+git add *.yaml
+git commit -m "Add/update alerts"
+git push
+```
+
+GitHub Actions will automatically validate (plan) on PRs and deploy (apply) on merge to main.
+
+---
+
+## Detailed Workflow
+
+### Managing Alerts
 
 You can manage application and infra alerting by following these steps:
 
-1. Create a new branch for checking in changes.
-2. Add relevant alerting yaml files in [./templates/alerts](./templates/alerts)
-3. Raise a PR.
-4. This will cause Last9 Infra-as-code (referred to IaC henceforth) to run a plan (similar to `terraform plan`) to do syntactic and semantic validation of the checked in files.
-5. Review and merge the PR to main.
-6. This will run an apply action (similar to `terraform apply`) to apply the changes and relevant alert groups will be updated on Last9.
+1. Create alert YAML files in your `<org>-alerts/` directory
+2. Create a new branch for checking in changes
+3. Raise a PR to the main branch
+4. Last9 IaC will run a plan (similar to `terraform plan`) to validate the alert definitions
+5. Review and merge the PR to main
+6. Last9 IaC will run an apply action (similar to `terraform apply`) to deploy changes to Last9
+
+**Note:** Alert templates are available in `templates/alerts/` directory for reference.
 
 ### GitHub Actions Setup & Required Secrets
 
-To enable automated validation and deployment of alerting rules using GitHub Actions, you must configure the following repository secrets:
+To enable automated validation and deployment of alerting rules using GitHub Actions, configure the following repository secrets:
 
 | Secret Name                  | Required | Description                                                                                 |
 |------------------------------|----------|---------------------------------------------------------------------------------------------|
-| AWS_ACCESS_KEY_ID            | Yes      | AWS access key for programmatic access                                                      |
-| AWS_SECRET_ACCESS_KEY        | Yes      | AWS secret key for programmatic access                                                      |
-| AWS_DEFAULT_REGION           | Yes      | AWS region (e.g., us-east-1)                                                                |
-| AWS_ASSUME_ROLE_ARN          | Yes*     | ARN of the AWS IAM role to assume (for cross-account or elevated access)                    |
-| AWS_ASSUME_ROLE_EXTERNAL_ID  | Yes*     | External ID for the assumed role (if required by your AWS setup)                            |
-| LAST9_BACKUP_S3_BUCKET       | Yes      | S3 bucket for Last9 IaC state backup                                                        |
-| LAST9_API_CONFIG_STR         | Yes      | JSON string with Last9 API config (see below for format)                                    |
+| LAST9_API_CONFIG_STR         | **Yes**  | JSON string with Last9 API config (see below for format)                                    |
+| AWS_ACCESS_KEY_ID            | Optional | AWS access key for S3 state locking (recommended for production)                            |
+| AWS_SECRET_ACCESS_KEY        | Optional | AWS secret key for S3 state locking                                                         |
+| AWS_DEFAULT_REGION           | Optional | AWS region (e.g., us-east-1)                                                                |
+| AWS_ASSUME_ROLE_ARN          | Optional | ARN of the AWS IAM role to assume (for cross-account or elevated access)                    |
+| AWS_ASSUME_ROLE_EXTERNAL_ID  | Optional | External ID for the assumed role (if required by your AWS setup)                            |
+| LAST9_BACKUP_S3_BUCKET       | Optional | S3 bucket for Last9 IaC state backup (required if using AWS S3 state locking)               |
 
-*Required if your workflow needs to assume a role for access. Otherwise, can be omitted if not using role assumption.
+**Note:** AWS secrets are optional. Without AWS configuration, the workflow will use local state locking. For single-user or development environments, local state locking is sufficient. For production with multiple team members or concurrent CI/CD runs, AWS S3 state locking is recommended to prevent conflicts.
+
+**Quick Setup:** Run `./scripts/setup-iac-env.sh` to automatically configure these secrets using the GitHub CLI.
 
 #### Example: `LAST9_API_CONFIG_STR`
 

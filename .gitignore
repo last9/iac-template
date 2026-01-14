@@ -1,0 +1,29 @@
+# Last9 IaC Configuration
+.last9.config.json
+
+# Python virtual environment
+/env/
+
+# State lock files
+*.lock
+*.lock.bak
+
+# Temporary files
+/tmp/
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+workspace
+.claude
