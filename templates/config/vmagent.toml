@@ -11,7 +11,7 @@
 tmpl_var_name_suffix = ""
 #
 # variable     : tmpl_var_vmagent_data_source
-# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+# description  : Last9 data source used to query for vmagent metrics. Check with Last9 for finding it out.
 #
 tmpl_var_vmagent_data_source = "vmagent_data_source"
 #
@@ -49,7 +49,7 @@ tmpl_var_name_suffix = ""
 tmpl_var_dashboard_tag = "vmagent"
 #
 # variable     : tmpl_var_vmagent_data_source
-# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+# description  : Last9 data source used to query for vmagent metrics. Check with Last9 for finding it out.
 #
 tmpl_var_vmagent_data_source = "vmagent_data_source"
 #
