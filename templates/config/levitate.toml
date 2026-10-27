@@ -11,12 +11,12 @@
 tmpl_var_name_suffix = ""
 #
 # variable     : tmpl_var_vmagent_data_source
-# description  : Levitate data source used to query for vmagent metrics. Check with Last9 for finding it out.
+# description  : Last9 data source used to query for vmagent metrics. Check with Last9 for finding it out.
 #
 tmpl_var_levitate_data_source = "levitate_data_source"
 #
 # variable     : tmpl_var_l9cluster_id
-# description  : Last9 Levitate cluster id. Check with Last9 for finding it out.
+# description  : Last9 cluster id. Check with Last9 for finding it out.
 #
 tmpl_var_l9cluster_id = "123123123"
 #
